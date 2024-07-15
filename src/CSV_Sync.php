@@ -31,6 +31,7 @@ abstract class CSV_Sync extends Import
      * @throws InvalidArgument
      * @throws UnavailableStream
      * @throws \League\Csv\Exception
+     * @throws Exception
      */
     public function split_csv_into_chunks(): void
     {
@@ -55,10 +56,8 @@ abstract class CSV_Sync extends Import
         }
 
         // Process chunks
-        $chunkCount = 0;
         foreach ($reader->chunkBy($this->chunkSize) as $chunk) {
             $this->schedule_chunk($chunk->getRecords());
-            $chunkCount++;
         }
 
         // Remove chunk file after sync
