@@ -17,7 +17,7 @@ trait Chunker
      */
     private function get_chunk_path(): string
     {
-        $filename = str_replace('/', '-', "{$this->get_sync_name()}_".time().".txt");
+        $filename = str_replace('/', '-', "{$this->get_sync_name()}_".microtime().".txt");
         $filename = apply_filters('as_processor/chunk/filename', $filename, $this);
 
         $folder = $tmp = get_temp_dir();
