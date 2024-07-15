@@ -9,7 +9,8 @@
         "woocommerce/action-scheduler": "^3.7",
         "league/csv": "^9.0",
         "sabre/dav": "^4.6",
-        "cardinalby/content-disposition": "^1.1"
+        "cardinalby/content-disposition": "^1.1",
+        "phpoffice/phpspreadsheet": "^2.1"
     },
     "support"     : {
         "issues" : "https://github.com/JUVOJustin/wp-secure-actions/issues"
