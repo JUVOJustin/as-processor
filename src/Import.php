@@ -14,7 +14,6 @@ abstract class Import extends Sync
     public function process_chunk(string $chunk_file_path): void
     {
         $this->import_chunk($chunk_file_path);
-
     }
 
 }
