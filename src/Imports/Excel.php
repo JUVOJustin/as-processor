@@ -65,7 +65,7 @@ abstract class Excel extends Import
      *
      * @return  void
      */
-    public function split_excel_chunks()
+    public function split_into_chunks()
     {
         $filepath = $this->get_source_filepath();
 
