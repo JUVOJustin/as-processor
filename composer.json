@@ -9,6 +9,7 @@
         "woocommerce/action-scheduler": "^3.7",
         "sabre/dav": "^4.6",
         "cardinalby/content-disposition": "^1.1",
+        "league/csv": "^9.0",
         "phpoffice/phpspreadsheet": "^2.1"
     },
     "support"     : {
