@@ -90,7 +90,7 @@ abstract class Excel extends Import
             $header = $worksheet->rangeToArray('A1:'.$worksheet->getHighestColumn().'1')[0];
         }
 
-        $rowData = [];
+        $chunkData = [];
         $rowIterator = $worksheet->getRowIterator( $starting_row );
         foreach ($rowIterator as $row) {
             if ($this->skipEmptyRows && $row->isEmpty()) { // Ignore empty rows
@@ -99,7 +99,7 @@ abstract class Excel extends Import
 
             $i = 0;
             $columnIterator = $row->getCellIterator();
-            $singleRowData = [];
+            $rowData = [];
             foreach ($columnIterator as $cell) {
 
                 // get the cell value
@@ -114,29 +114,28 @@ abstract class Excel extends Import
                     }
                 }
 
-                // append to single row array and check if there are headers
-                // if not, just append to the array
+                // Use header as key if set, else just append
                 if ( ! empty( $header ) ) {
-                    $singleRowData[$header[$i]] = $cellValue;
+                    $rowData[$header[$i]] = $cellValue;
                 } else {
-                    $singleRowData[] = $cellValue;
+                    $rowData[] = $cellValue;
                 }
                 $i++;
             }
-            $rowData[] = $singleRowData;
 
-            // schedule chunk if chunk size is reached and empty
-            // the rowData because we need it at the beginning of
-            // the loop again
-            if ( count($rowData) >= $this->chunkSize ) {
-                $this->schedule_chunk($rowData);
-                $rowData = [];
+            // Add row to chunk
+            $chunkData[] = $rowData;
+
+            // schedule chunk and empty chunk data
+            if ( count($chunkData) >= $this->chunkSize ) {
+                $this->schedule_chunk($chunkData);
+                $chunkData = [];
             }
         }
 
-        // push last chunk if not reached limit
-        if ( ! empty( $rowData ) ) {
-            $this->schedule_chunk($rowData);
+        // Add remaining elements into a last chunk
+        if ( ! empty( $chunkData ) ) {
+            $this->schedule_chunk($chunkData);
         }
 
         unlink($filepath);
