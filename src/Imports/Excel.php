@@ -93,9 +93,12 @@ abstract class Excel extends Import
         $chunkData = [];
         $rowIterator = $worksheet->getRowIterator( $starting_row );
         foreach ($rowIterator as $row) {
-            if ($this->skipEmptyRows && $row->isEmpty()) { // Ignore empty rows
-                continue;
-            }
+            if ( $this->skipEmptyRows && $row->isEmpty( 
+				CellIterator::TREAT_EMPTY_STRING_AS_EMPTY_CELL | 
+				CellIterator::TREAT_NULL_VALUE_AS_EMPTY_CELL )
+			) { // Ignore empty rows
+				continue;
+			}
 
             $i = 0;
             $columnIterator = $row->getCellIterator();
