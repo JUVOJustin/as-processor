@@ -3,6 +3,7 @@
 namespace juvo\AS_Processor\Imports;
 use juvo\AS_Processor\Import;
 use PhpOffice\PhpSpreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\CellIterator;
 
 /**
  * This class processes an excel file and splits its content
