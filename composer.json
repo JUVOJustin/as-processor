@@ -24,13 +24,15 @@
     ],
     "autoload": {
         "psr-4": {
-            "juvo\\AS_Processor\\": "src/"
+            "juvo\\AS_Processor\\": "src/",
+            "juvo\\AS_Processor\\Tests\\": "tests/"
         }
     },
     "require-dev": {
         "phpstan/phpstan": "^1.10.6",
         "szepeviktor/phpstan-wordpress": "^v1.1.7",
-        "phpstan/extension-installer": "^1.1"
+        "phpstan/extension-installer": "^1.1",
+        "phpunit/phpunit": "10"
     },
     "config": {
         "allow-plugins": {
@@ -38,6 +40,7 @@
         }
     },
     "scripts": {
-        "static-analyse": "@php ./vendor/bin/phpstan analyse"
+        "test:unit": "@php ./vendor/bin/phpunit tests",
+        "test:static": "@php ./vendor/bin/phpstan analyse"
     }
 }

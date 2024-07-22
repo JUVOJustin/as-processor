@@ -35,5 +35,8 @@ jobs:
           fail-on-cache-miss: true
         id: cache
 
-      - name: PHPSTAN
-        run: composer run static-analyse
+      - name: Static Analyse
+        run: composer run test:static
+
+      - name: PHP Unit Test
+        run: composer run test:unit

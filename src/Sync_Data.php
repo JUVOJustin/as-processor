@@ -201,160 +201,25 @@ trait Sync_Data
     }
 
     /**
-     * Recursively merges two arrays.
-     *
-     * This function provides options for both deep merging and array concatenation.
-     * When deep merging is enabled, nested arrays are recursively merged. When
-     * array concatenation is enabled, arrays are concatenated instead of being
-     * replaced.
+     * Merges two arrays with options for deep merging and array concatenation.
      *
      * @param array $array1 The original array.
      * @param array $array2 The array to merge into the original array.
      * @param bool $deepMerge Optional. Flag to control deep merging. Default is true.
-     *                        - true: Recursively merge nested arrays.
-     *                        - false: Replace nested arrays instead of merging.
      * @param bool $concatArrays Optional. Flag to control array concatenation. Default is false.
-     *                           - true: Concatenate arrays instead of replacing.
-     *                           - false: Replace arrays instead of concatenating.
      * @return array The merged array.
-     *
-     * @example
-     * // Example Data
-     * $currentData = [
-     *     'post_ids' => [
-     *         0 => 59576,
-     *         1 => 59578,
-     *         2 => 59579,
-     *         3 => 59581,
-     *         4 => 59583,
-     *     ],
-     *     'user_data' => [
-     *         'name' => 'John',
-     *         'roles' => ['admin', 'editor']
-     *     ]
-     * ];
-     *
-     * $updates = [
-     *     'post_ids' => [
-     *         0 => 59474,
-     *         1 => 59475,
-     *         2 => 59476,
-     *         3 => 59477,
-     *         4 => 59478,
-     *         5 => 59479,
-     *         6 => 59480,
-     *         7 => 59481,
-     *     ],
-     *     'user_data' => [
-     *         'name' => 'Jane',
-     *         'roles' => ['subscriber']
-     *     ]
-     * ];
-     *
-     * // Deep merge with array concatenation
-     * mergeArrays($currentData, $updates, true, true);
-     * // Result:
-     * // [
-     * //     'post_ids' => [
-     * //         0 => 59576,
-     * //         1 => 59578,
-     * //         2 => 59579,
-     * //         3 => 59581,
-     * //         4 => 59583,
-     * //         5 => 59474,
-     * //         6 => 59475,
-     * //         7 => 59476,
-     * //         8 => 59477,
-     * //         9 => 59478,
-     * //         10 => 59479,
-     * //         11 => 59480,
-     * //         12 => 59481,
-     * //     ],
-     * //     'user_data' => [
-     * //         'name' => 'Jane',
-     * //         'roles' => ['admin', 'editor', 'subscriber']
-     * //     ]
-     * // ]
-     *
-     * // Deep merge without array concatenation
-     * mergeArrays($currentData, $updates, true, false);
-     * // Result:
-     * // [
-     * //     'post_ids' => [
-     * //         0 => 59474,
-     * //         1 => 59475,
-     * //         2 => 59476,
-     * //         3 => 59477,
-     * //         4 => 59478,
-     * //         5 => 59479,
-     * //         6 => 59480,
-     * //         7 => 59481,
-     * //     ],
-     * //     'user_data' => [
-     * //         'name' => 'Jane',
-     * //         'roles' => ['subscriber']
-     * //     ]
-     * // ]
-     *
-     * // Shallow merge with array concatenation
-     * mergeArrays($currentData, $updates, false, true);
-     * // Result:
-     * // [
-     * //     'post_ids' => [
-     * //         0 => 59576,
-     * //         1 => 59578,
-     * //         2 => 59579,
-     * //         3 => 59581,
-     * //         4 => 59583,
-     * //         5 => 59474,
-     * //         6 => 59475,
-     * //         7 => 59476,
-     * //         8 => 59477,
-     * //         9 => 59478,
-     * //         10 => 59479,
-     * //         11 => 59480,
-     * //         12 => 59481,
-     * //     ],
-     * //     'user_data' => [
-     * //         'name' => 'Jane',
-     * //         'roles' => ['subscriber']
-     * //     ]
-     * // ]
-     *
-     * // Shallow merge without array concatenation
-     * mergeArrays($currentData, $updates, false, false);
-     * // Result:
-     * // [
-     * //     'post_ids' => [
-     * //         0 => 59474,
-     * //         1 => 59475,
-     * //         2 => 59476,
-     * //         3 => 59477,
-     * //         4 => 59478,
-     * //         5 => 59479,
-     * //         6 => 59480,
-     * //         7 => 59481,
-     * //     ],
-     * //     'user_data' => [
-     * //         'name' => 'Jane',
-     * //         'roles' => ['subscriber']
-     * //     ]
-     * // ]
      */
-    private function mergeArrays(array $array1, array $array2, bool $deepMerge = false, bool $concatArrays = false): array
+    private function mergeArrays(array $array1, array $array2, bool $deepMerge = true, bool $concatArrays = false): array
     {
         foreach ($array2 as $key => $value) {
-            if (is_array($value) && isset($array1[$key]) && is_array($array1[$key])) {
-                // If both arrays have the same key and values are arrays, we need to merge them
-                if ($deepMerge) {
-                    $array1[$key] = $this->mergeArrays($array1[$key], $value, $deepMerge, $concatArrays);
-                } elseif ($concatArrays) {
-                    $array1[$key] = $this->concatArraysPreserveKeys($array1[$key], $value);
-                } else {
-                    $array1[$key] = $value;
-                }
+            if (!isset($array1[$key]) || (!is_array($value) && !is_array($array1[$key]))) {
+                // If the key doesn't exist in array1 or either value is not an array, simply use the value from array2
+                $array1[$key] = $value;
+            } elseif (is_array($value) && is_array($array1[$key])) {
+                // Both values are arrays, merge them based on the merge strategy
+                $array1[$key] = $this->mergeArrayValues($array1[$key], $value, $deepMerge, $concatArrays);
             } else {
-                // Otherwise, set the value from the second array
+                // If types don't match (one is array, the other is not), use the value from array2
                 $array1[$key] = $value;
             }
         }
@@ -363,36 +228,60 @@ trait Sync_Data
     }
 
     /**
-     * Concatenate two arrays with keys
+     * Merges two array values based on the merge strategy.
      *
-     * This method concatenates two arrays with keys while preserving the keys and avoiding duplicates.
-     * If a key is an integer, the corresponding value will be appended to the first array.
-     * If a key is not an integer and exists in both arrays, and both values are arrays, the method will recursively merge them.
-     * If a key is not an integer and exists in both arrays, but either value is not an array, the value from the second array will be set.
-     *
-     * @param array $array1 The first array to concatenate with
-     * @param array $array2 The second array to concatenate
-     * @return array The concatenated array
+     * @param array $value1 The original array value.
+     * @param array $value2 The array value to merge into the original.
+     * @param bool $deepMerge Flag to control deep merging.
+     * @param bool $concatArrays Flag to control array concatenation.
+     * @return array The merged array value.
      */
-    private function concatArraysPreserveKeys(array $array1, array $array2): array
+    private function mergeArrayValues(array $value1, array $value2, bool $deepMerge, bool $concatArrays): array
     {
-        foreach ($array2 as $key => $value) {
-            if (is_int($key)) {
-                // Append value to the array, preserving keys and avoiding duplicates
-                if (!in_array($value, $array1, true)) {
-                    $array1[] = $value;
-                }
-            } else {
-                // If the key is not an integer, merge arrays if both values are arrays
-                if (isset($array1[$key]) && is_array($array1[$key]) && is_array($value)) {
-                    $array1[$key] = $this->concatArraysPreserveKeys($array1[$key], $value);
-                } else {
-                    // Otherwise, set the value from the second array
-                    $array1[$key] = $value;
-                }
-            }
+        $bothIndexed = $this->isIndexedArray($value1) && $this->isIndexedArray($value2);
+
+        if (!$deepMerge) {
+            return $this->shallowMerge($value1, $value2, $bothIndexed, $concatArrays);
         }
-        return $array1;
+
+        if ($bothIndexed) {
+            return $concatArrays ? array_merge($value1, $value2) : $value2;
+        }
+
+        return $this->mergeArrays($value1, $value2, true, $concatArrays);
+    }
+
+    /**
+     * Performs a shallow merge of two arrays.
+     *
+     * @param array $value1 The original array value.
+     * @param array $value2 The array value to merge into the original.
+     * @param bool $bothIndexed Whether both arrays are indexed.
+     * @param bool $concatArrays Flag to control array concatenation.
+     * @return array The shallow-merged array.
+     */
+    private function shallowMerge(array $value1, array $value2, bool $bothIndexed, bool $concatArrays): array
+    {
+        if ($bothIndexed) {
+            return $concatArrays ? array_merge($value1, $value2) : $value2;
+        }
+
+        // For associative arrays, merge at the top level
+        return $value2 + $value1;
+    }
+
+    /**
+     * Checks if an array is an indexed array (not associative).
+     *
+     * @param array $array The array to check.
+     * @return bool True if the array is indexed, false otherwise.
+     */
+    private function isIndexedArray(array $array): bool
+    {
+        if (empty($array)) {
+            return true; // Consider empty arrays as indexed
+        }
+        return array_keys($array) === range(0, count($array) - 1);
     }
 
     /**
