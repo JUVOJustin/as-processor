@@ -4,6 +4,7 @@ namespace juvo\AS_Processor;
 
 use ActionScheduler_Action;
 use ActionScheduler_Store;
+use Exception;
 
 abstract class Sync implements Syncable
 {
@@ -36,6 +37,8 @@ abstract class Sync implements Syncable
         if (method_exists($this, 'after_sync_complete')) {
             add_action($this->get_sync_name() . '/complete', [$this, 'after_sync_complete']);
         }
+
+        add_action('action_scheduler_failed_execution', [$this, 'on_fail_wrapper'], 10, 2);
     }
 
     /**
@@ -127,6 +130,31 @@ abstract class Sync implements Syncable
         $this->sync_group_name = $action->get_group();
 
         return $action;
+    }
+
+    /**
+     * Wraps the execution of the on_fail method, if it exists, for error handling.
+     * Checks if the errored action belongs to the sync. If so passes the action instead of the action_id to be more flexible
+     *
+     * @param int $action_id The ID of the action
+     * @param Exception $e The exception that was thrown
+     * @return void
+     */
+    public function on_fail_wrapper(int $action_id, Exception $e): void
+    {
+
+        // If the child, has the callback, for error handling we hook it up
+        if (!method_exists($this, 'on_fail')) {
+            return;
+        }
+
+        // Check if action belongs to sync
+        $action = $this->action_belongs_to_sync($action_id);
+        if (!$action || empty($action->get_group())) {
+            return;
+        }
+
+        $this->on_fail($action, $e);
     }
 
 }
