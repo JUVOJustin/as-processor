@@ -41,6 +41,16 @@ trait Chunker
      */
     protected function schedule_chunk(array|Iterator $chunkData): void
     {
+        // update chunk counter
+        if ( isset( $this->chunk_counter ) ) {
+            $this->chunk_counter += 1;
+        }
+
+        // check if we have a chunk limit
+        if ( $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
+            return;
+        }
+        
         $filename = $this->get_chunk_path();
 
         // Write data to Chunk file
