@@ -6,7 +6,8 @@ use Exception;
 
 abstract class Import extends Sync
 {
-
+    protected int $chunk_counter = 0;
+    protected int $chunk_limit = 0;
     /**
      * @param string $chunk_file_path
      * @throws Exception
