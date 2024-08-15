@@ -94,7 +94,11 @@ abstract class Sync implements Syncable
         ]);
 
         if (count($actions) === 0) {
-            do_action($this->get_sync_name() . '/complete');
+            as_enqueue_async_action( // @phpstan-ignore-line
+                $this->get_sync_name() . '/complete',
+                [], // empty arguments array
+                $this->sync_group_name
+            );
         }
     }
 
