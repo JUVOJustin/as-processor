@@ -42,12 +42,12 @@ trait Chunker
     protected function schedule_chunk(array|Iterator $chunkData): void
     {
         // update chunk counter
-        if ( isset( $this->chunk_counter ) ) {
+        if ( property_exists( $this, 'chunk_counter' ) ) {
             $this->chunk_counter += 1;
         }
 
         // check if we have a chunk limit
-        if ( isset( $this->chunk_limit ) && $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
+        if ( property_exists( $this, 'chunk_limit' ) && $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
             return;
         }
         
