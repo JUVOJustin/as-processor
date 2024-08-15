@@ -47,7 +47,7 @@ trait Chunker
         }
 
         // check if we have a chunk limit
-        if ( $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
+        if ( isset( $this->chunk_limit ) && $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
             return;
         }
         
