@@ -15,12 +15,6 @@ abstract class CSV_Sync extends Import
     protected bool $hasHeader = true;
     protected string $srcEncoding = "";
 
-    public function set_hooks(): void
-    {
-        parent::set_hooks();
-        add_action($this->get_sync_name(), [$this, 'split_csv_into_chunks']);
-    }
-
     abstract protected function get_source_csv_path(): string;
 
     /**
@@ -33,7 +27,7 @@ abstract class CSV_Sync extends Import
      * @throws \League\Csv\Exception
      * @throws Exception
      */
-    public function split_csv_into_chunks(): void
+    public function split_data_into_chunks(): void
     {
 
         $csvFilePath = $this->get_source_csv_path();

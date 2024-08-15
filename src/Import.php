@@ -9,6 +9,17 @@ abstract class Import extends Sync
     protected int $chunk_counter = 0;
     protected int $chunk_limit = 0;
 
+	/**
+	 * Adds the hooks for the chunking
+	 *
+	 * @return  void
+	 */
+	public function set_hooks(): void
+	{
+		parent::set_hooks();
+		add_action($this->get_sync_name(), [$this, 'split_data_into_chunks']);
+	}
+
     /**
 	 * Split the data, wherever it comes from into chunks.
 	 * This function has to be implemented within each "Import".

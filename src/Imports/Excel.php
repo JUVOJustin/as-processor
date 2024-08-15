@@ -44,30 +44,20 @@ abstract class Excel extends Import
     protected bool $skipEmptyRows = true;
 
     /**
-     * Sets the basic needed hooks
-     *
-     * @return  void
-     */
-    public function set_hooks(): void
-    {
-        parent::set_hooks();
-        add_action($this->get_sync_name(), [$this, 'split_into_chunks']);
-    }
-
-    /**
      * Gets the path to the excel file
      *
      * @return  string
      */
     abstract function get_source_filepath(): string;
 
-    /**
-     * Splits the excel files into chunks and schedules them
-     *
-     * @return  void
-     */
-    public function split_into_chunks()
-    {
+	/**
+	 * Splits the excel files into chunks and schedules them
+	 *
+	 * @return  void
+	 * @throws \Exception
+	 */
+    public function split_data_into_chunks(): void
+	{
         $filepath = $this->get_source_filepath();
 
         $reader = PhpSpreadsheet\IOFactory::createReader("Xlsx");

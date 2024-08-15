@@ -37,15 +37,6 @@ abstract class API extends Import
      */
     public int $chunk_size = 100;
 
-    public function set_hooks(): void
-    {
-        parent::set_hooks();
-
-        // register the hooks for the scheduled actions
-        // first of the regular scheduler main action
-        add_action($this->get_sync_name(), [$this, 'fetch']);
-    }
-
     /**
      * Makes a call to the api
      *
@@ -53,7 +44,7 @@ abstract class API extends Import
      * @return void
      * @throws Exception
      */
-    public function fetch(?int $index = null): void
+    public function split_data_into_chunks(?int $index = null): void
     {
 
         // Maybe set current index. Default value can be set with class parameter in child implementation
