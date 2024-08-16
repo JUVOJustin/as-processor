@@ -41,7 +41,7 @@ abstract class Sync implements Syncable
         // Hookup to error handling if on_fail is present in child
         add_action('action_scheduler_failed_execution', [$this, 'handle_exception'], 10, 2);
         if (method_exists($this, 'on_fail')) {
-            add_action($this->get_sync_name() . '/fail', [$this, 'on_fail'], 10, 2);
+            add_action($this->get_sync_name() . '/fail', [$this, 'on_fail'], 10, 3);
         }
     }
 
@@ -157,7 +157,7 @@ abstract class Sync implements Syncable
             return;
         }
 
-        do_action($this->get_sync_name() . '/fail', $action, $e );
+        do_action($this->get_sync_name() . '/fail', $action, $e, $action_id );
     }
 
 }
