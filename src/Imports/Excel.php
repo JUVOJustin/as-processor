@@ -136,8 +136,8 @@ abstract class Excel extends Import
             $this->schedule_chunk($chunkData);
         }
 
-        $test_unlink = unlink($filepath);
-        if ( $test_unlink === false ) {
+        $unlink_result = unlink($filepath);
+        if ( $unlink_result === false ) {
             throw new Exception("File '$filepath' could not be deleted!");
         }
     }
