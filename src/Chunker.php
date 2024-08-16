@@ -126,7 +126,10 @@ trait Chunker
         fclose($file);
 
         // Remove chunk file after sync
-        unlink($chunk_file_path);
+        $test_unlink = unlink($chunk_file_path);
+        if ( $test_unlink === false ) {
+            throw new Exception("File '$chunk_file_path' could not be deleted!");
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 namespace juvo\AS_Processor\Imports;
+use Exception;
 use juvo\AS_Processor\Import;
 use PhpOffice\PhpSpreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\CellIterator;
@@ -59,6 +60,9 @@ abstract class Excel extends Import
     public function split_data_into_chunks(): void
 	{
         $filepath = $this->get_source_filepath();
+        if (!file_exists($filepath)) {
+            throw new Exception("Failed to open the file: $filepath");
+        }
 
         $reader = PhpSpreadsheet\IOFactory::createReader("Xlsx");
         $spreadsheet = $reader->load($filepath);
@@ -132,6 +136,9 @@ abstract class Excel extends Import
             $this->schedule_chunk($chunkData);
         }
 
-        unlink($filepath);
+        $test_unlink = unlink($filepath);
+        if ( $test_unlink === false ) {
+            throw new Exception("File '$filepath' could not be deleted!");
+        }
     }
 }
