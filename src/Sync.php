@@ -94,12 +94,9 @@ abstract class Sync implements Syncable
             return;
         }
 
-        $actions = as_get_scheduled_actions([
-            'group' => $this->get_sync_group_name(),
-            'status' => ActionScheduler_Store::STATUS_PENDING,
-        ]);
-
-        if (count($actions) === 0) {
+        // Use as_has_scheduled_action to efficiently determine if action of same group is running
+        $running = as_has_scheduled_action('', null, $this->get_sync_group_name());
+        if (!$running) {
             as_enqueue_async_action( // @phpstan-ignore-line
                 $this->get_sync_name() . '/complete',
                 [], // empty arguments array
