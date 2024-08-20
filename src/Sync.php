@@ -88,6 +88,12 @@ abstract class Sync implements Syncable
             return;
         }
 
+        // avoid recoursion by not hooking a complete action while
+        // in complete context
+        if ( $action->get_hook() == $this->get_sync_name() . '/complete' ) {
+            return;
+        }
+
         $actions = as_get_scheduled_actions([
             'group' => $this->get_sync_group_name(),
             'status' => ActionScheduler_Store::STATUS_PENDING,
@@ -97,7 +103,7 @@ abstract class Sync implements Syncable
             as_enqueue_async_action( // @phpstan-ignore-line
                 $this->get_sync_name() . '/complete',
                 [], // empty arguments array
-                ''
+                $this->get_sync_group_name()
             );
         }
     }
