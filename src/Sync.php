@@ -1,11 +1,6 @@
 <?php
-/**
- * @license GPL-3.0-or-later
- *
- * Modified by Justin Vogt on 21-August-2024 using {@see https://github.com/BrianHenryIE/strauss}.
- */
 
-namespace Sinnewerk\Dependencies\juvo\AS_Processor;
+namespace juvo\AS_Processor;
 
 use ActionScheduler;
 use ActionScheduler_Action;
