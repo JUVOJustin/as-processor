@@ -1,7 +1,13 @@
 <?php
+/**
+ * @license GPL-3.0-or-later
+ *
+ * Modified by Justin Vogt on 21-August-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ */
 
-namespace juvo\AS_Processor;
+namespace Sinnewerk\Dependencies\juvo\AS_Processor;
 
+use ActionScheduler;
 use ActionScheduler_Action;
 use ActionScheduler_Store;
 use Exception;
@@ -16,7 +22,8 @@ abstract class Sync implements Syncable
 
     private string $sync_group_name;
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->set_hooks();
     }
 
@@ -25,11 +32,12 @@ abstract class Sync implements Syncable
      *
      * @return void
      */
-    public function set_hooks(): void {
+    public function set_hooks(): void
+    {
         add_action('action_scheduler_begin_execute', function(int $action_id) {
             $this->maybe_trigger_last_in_group($action_id);
         }, 10, 1);
-        add_action( 'action_scheduler_before_execute', [$this, 'track_action_group'], 10, 2 );
+        add_action('action_scheduler_before_execute', [$this, 'track_action_group'], 10, 2);
         add_action('action_scheduler_completed_action', [$this, 'maybe_trigger_last_in_group']);
         add_action($this->get_sync_name() . '/process_chunk', [$this, 'process_chunk']);
 
@@ -68,9 +76,43 @@ abstract class Sync implements Syncable
     public function get_sync_group_name(): string
     {
         if (empty($this->sync_group_name)) {
-            $this->sync_group_name = $this->get_sync_name() . '_'. time();
+            $this->sync_group_name = $this->get_sync_name() . '_' . time();
         }
         return $this->sync_group_name;
+    }
+
+    /**
+     * Query actions belonging to this specific group.
+     *
+     * @param array $status
+     * @param int $per_page
+     * @return int[]|false
+     */
+    protected function get_actions(array $status = [ActionScheduler_Store::STATUS_RUNNING, ActionScheduler_Store::STATUS_PENDING], int $per_page = 5): array|false
+    {
+
+        if (!ActionScheduler::is_initialized(__FUNCTION__)) {
+            return false;
+        }
+
+        // If no specific status is set, get action for all possible ones
+        if (empty($status)) {
+            $status = [
+                ActionScheduler_Store::STATUS_COMPLETE,
+                ActionScheduler_Store::STATUS_PENDING,
+                ActionScheduler_Store::STATUS_RUNNING,
+                ActionScheduler_Store::STATUS_FAILED,
+                ActionScheduler_Store::STATUS_CANCELED,
+            ];
+        }
+
+        $store = ActionScheduler::store();
+        return $store->query_actions([
+            'group'    => $this->get_sync_group_name(),
+            'claimed'  => null,
+            'status'   => $status,
+            'per_page' => $per_page
+        ]);
     }
 
     /**
@@ -90,17 +132,17 @@ abstract class Sync implements Syncable
 
         // avoid recoursion by not hooking a complete action while
         // in complete context
-        if ( $action->get_hook() == $this->get_sync_name() . '/complete' ) {
+        if ($action->get_hook() == $this->get_sync_name() . '/complete') {
             return;
         }
 
         // Use as_has_scheduled_action to efficiently determine if action of same group is running
-        $running = as_has_scheduled_action('', null, $this->get_sync_group_name());
-        if (!$running) {
+        $actions = $this->get_actions(per_page: 1);
+        if (count($actions) === 0) {
             as_enqueue_async_action( // @phpstan-ignore-line
                 $this->get_sync_name() . '/complete',
                 [], // empty arguments array
-                $this->sync_group_name
+                $this->get_sync_group_name()
             );
         }
     }
@@ -113,7 +155,8 @@ abstract class Sync implements Syncable
      * @param mixed $context
      * @return void
      */
-    public function track_action_group(int $action_id, mixed $context) {
+    public function track_action_group(int $action_id, mixed $context)
+    {
         $action = $this->action_belongs_to_sync($action_id);
         if (!$action || empty($action->get_group())) {
             return;
@@ -130,7 +173,7 @@ abstract class Sync implements Syncable
      */
     private function action_belongs_to_sync(int $action_id): false|ActionScheduler_Action
     {
-        $action = ActionScheduler_Store::instance()->fetch_action((string) $action_id);
+        $action = ActionScheduler_Store::instance()->fetch_action((string)$action_id);
 
         // Action must contain the sync name as hook. Else it does not belong to sync
         if (!str_contains($action->get_hook(), $this->get_sync_name())) {
@@ -160,7 +203,7 @@ abstract class Sync implements Syncable
             return;
         }
 
-        do_action($this->get_sync_name() . '/fail', $action, $e, $action_id );
+        do_action($this->get_sync_name() . '/fail', $action, $e, $action_id);
     }
 
 }
