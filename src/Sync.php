@@ -79,35 +79,28 @@ abstract class Sync implements Syncable
     /**
      * Query actions belonging to this specific group.
      *
-     * @param array $status
-     * @param int $per_page
+     * @param array $status array of Stati to query. By default, queries all.
+     * @param int $per_page number of action ids to receive.
      * @return int[]|false
      */
-    protected function get_actions(array $status = [ActionScheduler_Store::STATUS_RUNNING, ActionScheduler_Store::STATUS_PENDING], int $per_page = 5): array|false
+    protected function get_actions(array $status = [], int $per_page = 5): array|false
     {
 
         if (!ActionScheduler::is_initialized(__FUNCTION__)) {
             return false;
         }
 
-        // If no specific status is set, get action for all possible ones
-        if (empty($status)) {
-            $status = [
-                ActionScheduler_Store::STATUS_COMPLETE,
-                ActionScheduler_Store::STATUS_PENDING,
-                ActionScheduler_Store::STATUS_RUNNING,
-                ActionScheduler_Store::STATUS_FAILED,
-                ActionScheduler_Store::STATUS_CANCELED,
-            ];
-        }
-
         $store = ActionScheduler::store();
-        return $store->query_actions([
+        $action_ids = $store->query_actions([
             'group'    => $this->get_sync_group_name(),
             'claimed'  => null,
             'status'   => $status,
             'per_page' => $per_page
         ]);
+
+        return array_map(function($action_id) {
+            return intval($action_id);
+        }, $action_ids);
     }
 
     /**
@@ -131,10 +124,10 @@ abstract class Sync implements Syncable
             return;
         }
 
-        // Use as_has_scheduled_action to efficiently determine if action of same group is running
-        $actions = $this->get_actions(per_page: 1);
+        // Check if action of the same group is running or pending
+        $actions = $this->get_actions(status: [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING], per_page: 1);
         if (count($actions) === 0) {
-            as_enqueue_async_action( // @phpstan-ignore-line
+            as_enqueue_async_action(
                 $this->get_sync_name() . '/complete',
                 [], // empty arguments array
                 $this->get_sync_group_name()
