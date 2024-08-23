@@ -9,15 +9,19 @@ abstract class Import extends Sync
     protected int $chunk_counter = 0;
     protected int $chunk_limit = 0;
 
-	/**
-	 * Adds the hooks for the chunking
-	 *
-	 * @return  void
-	 */
+    /**
+     * Adds the hooks for the chunking
+     *
+     * @return  void
+     * @throws Exception
+     */
 	public function set_hooks(): void
 	{
 		parent::set_hooks();
 		add_action($this->get_sync_name(), [$this, 'split_data_into_chunks']);
+        add_action($this->get_sync_name(), function() {
+            $this->get_stats()->start_sync();
+        });
 	}
 
     /**
