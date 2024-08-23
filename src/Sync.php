@@ -134,17 +134,12 @@ abstract class Sync implements Syncable, Stats_Saver
             // Mark sync as complete
             $this->get_stats()->end_sync();
 
-            $json = $this->get_stats()->to_json();
-
             as_enqueue_async_action(
                 $this->get_sync_name() . '/complete',
                 [], // empty arguments array
                 $this->get_sync_group_name()
             );
         }
-
-        // Maybe update stats
-        $this->maybe_update_stats();
     }
 
     /**

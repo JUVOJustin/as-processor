@@ -112,11 +112,11 @@ class Stats
      * Get the count of actions by status.
      *
      * @param string $status
-     * @return int
+     * @return array
      */
-    public function get_action_count_by_status(string $status): int
+    public function get_actions_by_status(string $status): array
     {
-        return count(array_filter($this->actions, fn($action) => $action['status'] === $status));
+        return array_filter($this->actions, fn($action) => $action['status'] === $status);
     }
 
     /**
@@ -231,13 +231,11 @@ class Stats
         $email_text .= sprintf(__("Slowest Action Duration: %s seconds", 'as-processor'), $this->get_slowest_action()['duration'] ?? __('N/A', 'as-processor')) . "\n";
         $email_text .= sprintf(__("Fastest Action Duration: %s seconds", 'as-processor'), $this->get_fastest_action()['duration'] ?? __('N/A', 'as-processor')) . "\n";
 
-        $email_text .= "\n" . __("Actions Detail:", 'as-processor') . "\n";
-        foreach ($this->actions as $action) {
+        $email_text .= "\n" . __("Failed Actions Detail:", 'as-processor') . "\n";
+        foreach ($this->get_actions_by_status('failed') as $action) {
             $email_text .= sprintf(__("Action ID: %s", 'as-processor'), $action['id']) . "\n";
             $email_text .= sprintf(__("Status: %s", 'as-processor'), $action['status']) . "\n";
             $email_text .= sprintf(__("Start: %s", 'as-processor'), $action['start']->format('Y-m-d H:i:s')) . "\n";
-            $email_text .= sprintf(__("End: %s", 'as-processor'), $action['end']->format('Y-m-d H:i:s')) . "\n";
-            $email_text .= sprintf(__("Duration: %s seconds", 'as-processor'), $action['duration']) . "\n";
             if ($action['status'] === 'failed') {
                 $email_text .= sprintf(__("Error Message: %s", 'as-processor'), $action['error_message']) . "\n";
             }
