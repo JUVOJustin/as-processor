@@ -58,6 +58,7 @@ class Stats
     }
 
     /**
+     * /**
      * @param int $id
      * @return void
      * @throws \Exception
@@ -69,12 +70,7 @@ class Stats
         }
 
         $this->actions[$id]['end'] = current_datetime();
-        $this->actions[$id]['duration'] = $this->actions[$id]['end']->getTimestamp() - $this->actions[$id]['start']->getTimestamp();
-
-        $this->actions[$id] = [
-            'id'    => $id,
-            'start' => current_datetime(),
-        ];
+        $this->actions[$id]['duration'] = (float)$this->actions[$id]['end']->format('U.u') - (float)$this->actions[$id]['start']->format('U.u');
         $this->save();
     }
 
@@ -92,14 +88,14 @@ class Stats
     /**
      * Get the total duration of the sync process.
      *
-     * @return int
+     * @return float
      */
-    public function get_sync_duration(): int
+    public function get_sync_duration(): float
     {
         if (isset($this->sync_start) && isset($this->sync_end)) {
-            return $this->sync_end->getTimestamp() - $this->sync_start->getTimestamp();
+            return (float)$this->sync_end->format('U.u') - (float)$this->sync_start->format('U.u');
         }
-        return 0;
+        return 0.0;
     }
 
     /**
@@ -135,13 +131,19 @@ class Stats
     }
 
     /**
+     * /**
      * Find the action with the longest duration.
      *
      * @return array|null
      */
     public function get_slowest_action(): ?array
     {
-        return !empty($this->actions) ? max($this->actions, fn($a, $b) => $a['duration'] <=> $b['duration']) : null;
+        if (empty($this->actions)) {
+            return null;
+        }
+        return array_reduce($this->actions, function($a, $b) {
+            return ($a['duration'] ?? 0) > ($b['duration'] ?? 0) ? $a : $b;
+        });
     }
 
     /**
@@ -151,7 +153,12 @@ class Stats
      */
     public function get_fastest_action(): ?array
     {
-        return !empty($this->actions) ? min($this->actions, fn($a, $b) => $a['duration'] <=> $b['duration']) : null;
+        if (empty($this->actions)) {
+            return null;
+        }
+        return array_reduce($this->actions, function($a, $b) {
+            return ($a['duration'] ?? PHP_INT_MAX) < ($b['duration'] ?? PHP_INT_MAX) ? $a : $b;
+        });
     }
 
     /**
