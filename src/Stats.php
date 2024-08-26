@@ -43,6 +43,30 @@ class Stats
     }
 
     /**
+     * Retrieves the duration of a sync.
+     *
+     * @param bool $human_time Optional. Whether to return the duration in a human-readable format. Default value is false.
+     * @return float|string|false The duration of the sync in microseconds, rounded to 4 decimal places. If $human_time is true,
+     *                     the duration will be converted to a human-readable format. If the sync start or end time is empty,
+     *                     returns false.
+     */
+    public function get_sync_duration(bool $human_time = false): float|string|false {
+        if (
+            empty($this->sync_start)
+            || empty($this->sync_end)
+        ) {
+            return false;
+        }
+
+        $duration = round((float)$this->sync_end->format('U.u') - (float)$this->sync_start->format('U.u'), 4);
+        if ($human_time) {
+            return $this->human_time_diff_microseconds(0, $duration);
+        }
+
+        return $duration;
+    }
+
+    /**
      * Add a new action with its details.
      *
      * @param int $id
@@ -70,10 +94,19 @@ class Stats
             return;
         }
 
+        $this->actions[$id]['status'] = 'success';
         $this->actions[$id]['end'] = current_datetime();
         $this->save();
     }
 
+    /**
+     * Marks an action as failed.
+     *
+     * @param int $id The ID of the action to mark as failed.
+     * @param string $error_message The error message associated with the failed action.
+     * @return void
+     * @throws \Exception If the action ID is not found in the actions array.
+     */
     public function mark_action_as_failed(int $id, string $error_message): void
     {
         if (!isset($this->actions[$id])) {
@@ -85,7 +118,16 @@ class Stats
         $this->save();
     }
 
-    public function get_action_duration(int $id, bool $human_time = false): float|string {
+    /**
+     * Retrieves the duration of an action.
+     *
+     * @param int $id The id of the action.
+     * @param bool $human_time Optional. Whether to return the duration in a human-readable format. Default value is false.
+     * @return float|string|false The duration of the action in microseconds, rounded to 4 decimal places. If $human_time is true,
+     *                     the duration will be converted to a human-readable format. If the action doesn't exist or if the
+     *                     start or end time is empty, returns false.
+     */
+    public function get_action_duration(int $id, bool $human_time = false): float|string|false {
         if (
             !isset($this->actions[$id])
             || empty($this->actions[$id]['end'])
@@ -95,8 +137,8 @@ class Stats
         }
 
         $duration = round((float)$this->actions[$id]['end']->format('U.u') - (float)$this->actions[$id]['start']->format('U.u'), 4);
-        if ($human_time && $duration >= 1) {
-            return human_time_diff(0, $duration);
+        if ($human_time) {
+            return $this->human_time_diff_microseconds(0, $duration);
         }
 
         return $duration;
@@ -159,7 +201,7 @@ class Stats
             }
         }
         $average = $action_count > 0 ? $total_duration / $action_count : 0;
-        return $human_time ? human_time_diff(0, $average) : $average;
+        return $human_time ? $this->human_time_diff_microseconds(0, $average) : $average;
     }
 
     /**
@@ -252,7 +294,7 @@ class Stats
             'sync_start'              => $this->get_sync_start()?->format(DateTimeImmutable::ATOM),
             'sync_end'                => $this->get_sync_end()?->format(DateTimeImmutable::ATOM),
             'total_actions'           => $this->get_total_actions(),
-            'sync_duration'           => $this->sync_end->format('U') - $this->sync_start->format('U'),
+            'sync_duration'           => $this->get_sync_duration(),
             'average_action_duration' => $this->get_average_action_duration(),
             'slowest_action'          => $this->get_slowest_action(),
             'fastest_action'          => $this->get_fastest_action(),
@@ -275,7 +317,7 @@ class Stats
         $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), $this->get_sync_start()?->format('Y-m-d H:i:s')) . "\n";
         $email_text .= sprintf(__("Sync End: %s", 'as-processor'), $this->get_sync_end()?->format('Y-m-d H:i:s')) . "\n";
         $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), $this->get_total_actions()) . "\n";
-        $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), human_time_diff($this->sync_end->format('U'), $this->sync_start->format('U'))) . "\n";
+        $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), $this->get_sync_duration(true)) . "\n";
         $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), $this->get_average_action_duration(true)) . "\n";
         $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), $this->get_slowest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
         $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), $this->get_fastest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
@@ -316,5 +358,103 @@ class Stats
         }
 
         $this->saver->save_stats($this);
+    }
+
+    /**
+     * Calculates the human-readable time difference in microseconds between two given timestamps.
+     *
+     * @param float $from The starting timestamp.
+     * @param float $to The ending timestamp. If not provided, the current timestamp will be used.
+     * @return string The human-readable time difference in microseconds.
+     */
+    private function human_time_diff_microseconds( float $from, float $to = 0 ): string
+    {
+        if ( empty( $to ) ) {
+            $to = microtime(true);
+        }
+        $diff = abs( $to - $from );
+
+        $time_strings = array();
+
+        if ( $diff < 1 ) { // Less than 1 second
+            $millisecs = (int)($diff * 1000);
+            $microsecs = (int)(($diff * 1000000) % 1000);
+
+            if ( $millisecs > 0 ) {
+                /* translators: Time difference in milliseconds */
+                $time_strings[] = sprintf( _n( '%s millisecond', '%s milliseconds', $millisecs, 'as-processor' ), $millisecs );
+            }
+            if ( $microsecs > 0 ) {
+                /* translators: Time difference in microseconds */
+                $time_strings[] = sprintf( _n( '%s microsecond', '%s microseconds', $microsecs, 'as-processor' ), $microsecs );
+            }
+        } else {
+            $remaining_seconds = $diff;
+
+            $years = (int)($remaining_seconds / YEAR_IN_SECONDS);
+            if ( $years > 0 ) {
+                /* translators: Time difference in years */
+                $time_strings[] = sprintf( _n( '%s year', '%s years', $years ), $years );
+                $remaining_seconds -= $years * YEAR_IN_SECONDS;
+            }
+
+            $months = (int)($remaining_seconds / MONTH_IN_SECONDS);
+            if ( $months > 0 ) {
+                /* translators: Time difference in months */
+                $time_strings[] = sprintf( _n( '%s month', '%s months', $months ), $months );
+                $remaining_seconds -= $months * MONTH_IN_SECONDS;
+            }
+
+            $weeks = (int)($remaining_seconds / WEEK_IN_SECONDS);
+            if ( $weeks > 0 ) {
+                /* translators: Time difference in weeks */
+                $time_strings[] = sprintf( _n( '%s week', '%s weeks', $weeks ), $weeks );
+                $remaining_seconds -= $weeks * WEEK_IN_SECONDS;
+            }
+
+            $days = (int)($remaining_seconds / DAY_IN_SECONDS);
+            if ( $days > 0 ) {
+                /* translators: Time difference in days */
+                $time_strings[] = sprintf( _n( '%s day', '%s days', $days ), $days );
+                $remaining_seconds -= $days * DAY_IN_SECONDS;
+            }
+
+            $hours = (int)($remaining_seconds / HOUR_IN_SECONDS);
+            if ( $hours > 0 ) {
+                /* translators: Time difference in hours */
+                $time_strings[] = sprintf( _n( '%s hour', '%s hours', $hours ), $hours );
+                $remaining_seconds -= $hours * HOUR_IN_SECONDS;
+            }
+
+            $minutes = (int)($remaining_seconds / MINUTE_IN_SECONDS);
+            if ( $minutes > 0 ) {
+                /* translators: Time difference in minutes */
+                $time_strings[] = sprintf( _n( '%s minute', '%s minutes', $minutes ), $minutes );
+                $remaining_seconds -= $minutes * MINUTE_IN_SECONDS;
+            }
+
+            $seconds = (int)$remaining_seconds;
+            if ( $seconds > 0 ) {
+                /* translators: Time difference in seconds */
+                $time_strings[] = sprintf( _n( '%s second', '%s seconds', $seconds ), $seconds );
+                $remaining_seconds -= $seconds;
+            }
+
+            $milliseconds = (int)($remaining_seconds * 1000);
+            if ( $milliseconds > 0 ) {
+                /* translators: Time difference in milliseconds */
+                $time_strings[] = sprintf( _n( '%s millisecond', '%s milliseconds', $milliseconds, 'as-processor' ), $milliseconds );
+            }
+
+            $microseconds = (int)(($remaining_seconds * 1000000) % 1000);
+            if ( $microseconds > 0 ) {
+                /* translators: Time difference in microseconds */
+                $time_strings[] = sprintf( _n( '%s microsecond', '%s microseconds', $microseconds, 'as-processor' ), $microseconds );
+            }
+        }
+
+        // Join the time strings
+        $separator = _x( ', ', 'Human time diff separator', 'as-processor' );
+        return implode( $separator, $time_strings );
     }
 }

@@ -162,8 +162,10 @@ abstract class Sync implements Syncable, Stats_Saver
 
         $this->sync_group_name = $action->get_group();
 
-        // Update stats
-        $this->get_stats()->add_action($action_id);
+        // Track action start if it is not the complete action
+        if (!str_contains($action->get_hook(), "/complete")) {
+            $this->get_stats()->add_action($action_id);
+        }
     }
 
     /**
