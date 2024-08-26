@@ -313,7 +313,7 @@ class Stats
      */
     public function prepare_email_text(array $custom_data = []): string
     {
-        $email_text = __("Synchronization Report:", 'as-processor') . "\n";
+        $email_text = "--- ". __("Synchronization Report:", 'as-processor') . " ---\n";
         $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), $this->get_sync_start()?->format('Y-m-d H:i:s')) . "\n";
         $email_text .= sprintf(__("Sync End: %s", 'as-processor'), $this->get_sync_end()?->format('Y-m-d H:i:s')) . "\n";
         $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), $this->get_total_actions()) . "\n";
@@ -325,7 +325,7 @@ class Stats
         // Failed actions
         $failed_actions = $this->get_actions_by_status('failed');
         if (!empty($failed_actions)) {
-            $email_text .= "\n" . __("Failed Actions Detail:", 'as-processor') . "\n";
+            $email_text .= "\n-- " . __("Failed Actions Detail:", 'as-processor') . " --\n";
             foreach ($failed_actions as $action) {
                 $email_text .= sprintf(__("Action ID: %s", 'as-processor'), $action['id']) . "\n";
                 $email_text .= sprintf(__("Status: %s", 'as-processor'), $action['status']) . "\n";
@@ -339,7 +339,7 @@ class Stats
 
         // Append custom data if available
         if (!empty($custom_data)) {
-            $email_text .= "\n" . __("Custom Data:", 'as-processor') . "\n";
+            $email_text .= "\n-- " . __("Custom Data:", 'as-processor') . " --\n";
             foreach ($custom_data as $key => $value) {
                 $email_text .= sprintf(__("%s: %s", 'as-processor'), ucfirst($key), (is_array($value) ? json_encode($value) : $value)) . "\n";
             }
@@ -377,8 +377,9 @@ class Stats
         $time_strings = array();
 
         if ( $diff < 1 ) { // Less than 1 second
-            $millisecs = (int)($diff * 1000);
-            $microsecs = (int)(($diff * 1000000) % 1000);
+            $total_microsecs = (int)($diff * 1000000);
+            $millisecs = (int)($total_microsecs / 1000);
+            $microsecs = $total_microsecs % 1000;
 
             if ( $millisecs > 0 ) {
                 /* translators: Time difference in milliseconds */
@@ -446,7 +447,7 @@ class Stats
                 $time_strings[] = sprintf( _n( '%s millisecond', '%s milliseconds', $milliseconds, 'as-processor' ), $milliseconds );
             }
 
-            $microseconds = (int)(($remaining_seconds * 1000000) % 1000);
+            $microseconds = (int)($remaining_seconds * 1000000) - ($milliseconds * 1000);
             if ( $microseconds > 0 ) {
                 /* translators: Time difference in microseconds */
                 $time_strings[] = sprintf( _n( '%s microsecond', '%s microseconds', $microseconds, 'as-processor' ), $microseconds );
