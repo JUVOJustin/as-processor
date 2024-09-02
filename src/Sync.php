@@ -30,7 +30,8 @@ abstract class Sync implements Syncable, Stats_Saver
     public function set_hooks(): void
     {
         add_action('action_scheduler_begin_execute', [$this, 'track_action_start'], 10, 2);
-        add_action('action_scheduler_completed_action', [$this, 'maybe_trigger_last_in_group']);
+        add_action('action_scheduler_after_execute', [$this, 'track_action_end'], 10, 2);
+        add_action('action_scheduler_completed_action', [$this, 'track_action_completed'], 10, 2);
         add_action($this->get_sync_name() . '/process_chunk', [$this, 'process_chunk']);
 
         // If the child, has the callback, we hook it up
@@ -101,48 +102,6 @@ abstract class Sync implements Syncable, Stats_Saver
     }
 
     /**
-     * Runs when an action is completed.
-     *
-     * Checks if there are more remaining jobs in the queue or if this is the last one.
-     * This can be used to add additional cleanup jobs
-     *
-     * @param int $action_id
-     * @return void
-     * @throws Exception
-     */
-    public function maybe_trigger_last_in_group(int $action_id): void
-    {
-
-        $action = $this->action_belongs_to_sync($action_id);
-        if (!$action || empty($action->get_group())) {
-            return;
-        }
-
-        // avoid recoursion by not hooking a complete action while
-        // in complete context
-        if ($action->get_hook() == $this->get_sync_name() . '/complete') {
-            return;
-        }
-
-        // Mark action as complete
-        $this->get_stats()->end_action($action_id);
-
-        // Check if action of the same group is running or pending
-        $actions = $this->get_actions(status: [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING], per_page: 1);
-        if (count($actions) === 0) {
-
-            // Mark sync as complete
-            $this->get_stats()->end_sync();
-
-            as_enqueue_async_action(
-                $this->get_sync_name() . '/complete',
-                [], // empty arguments array
-                $this->get_sync_group_name()
-            );
-        }
-    }
-
-    /**
      * Runs when an action is started.
      *
      * Callback for "action_scheduler_before_execute" hook. It gets the current action and (re)sets the group name.
@@ -169,14 +128,85 @@ abstract class Sync implements Syncable, Stats_Saver
     }
 
     /**
-     * Checks if the passed action belongs to the sync. If so returns the action object else false.
+     * Runs after the action is executed but before it is marked as complete.
+     *
+     * Callback for "action_scheduler_after_execute" hook.
+     * This is needed to track the action end in the stats.
+     * This is the closest we can get to track the end of the action.
      *
      * @param int $action_id
+     * @param ActionScheduler_Action $action
+     * @return void
+     * @throws Exception
+     */
+    public function track_action_end(int $action_id, ActionScheduler_Action $action): void
+    {
+        $action = $this->action_belongs_to_sync($action);
+        if (!$action || empty($action->get_group())) {
+            return;
+        }
+
+        // "Complete" action is not tracked
+        if ($action->get_hook() == $this->get_sync_name() . '/complete') {
+            return;
+        }
+
+        // Mark action as complete
+        $this->get_stats()->end_action($action_id);
+    }
+
+    /**
+     * Runs when an action is marked as completed.
+     * The main difference to "track_action_end" is that this function is called after anohter Log entry is added to
+     * the action scheduler database, leading to state issues.
+     *
+     * Callback for "action_scheduler_completed_action" hook.
+     * Checks if there are more remaining jobs in the queue or if this is the last one.
+     * This can be used to add additional logic after the sync is complete
+     *
+     * @param int $action_id
+     * @return void
+     * @throws Exception
+     */
+    public function track_action_completed(int $action_id): void
+    {
+        $action = $this->action_belongs_to_sync($action_id);
+        if (!$action || empty($action->get_group())) {
+            return;
+        }
+
+        // "Complete" action is not tracked
+        if ($action->get_hook() == $this->get_sync_name() . '/complete') {
+            return;
+        }
+
+        // Check if action of the same group is running or pending
+        $actions = $this->get_actions(status: [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING], per_page: 1);
+
+        // If the only action in the group is the one we just completed, mark the sync as complete
+        if (count($actions) === 0) {
+            // Mark sync as complete
+            $this->get_stats()->end_sync();
+
+            as_enqueue_async_action(
+                $this->get_sync_name() . '/complete',
+                [], // empty arguments array
+                $this->get_sync_group_name()
+            );
+        }
+    }
+
+    /**
+     * Checks if the passed action belongs to the sync. If so returns the action object else false.
+     *
+     * @param int|ActionScheduler_Action $action
      * @return false|ActionScheduler_Action
      */
-    private function action_belongs_to_sync(int $action_id): false|ActionScheduler_Action
+    private function action_belongs_to_sync(int|ActionScheduler_Action $action): false|ActionScheduler_Action
     {
-        $action = ActionScheduler_Store::instance()->fetch_action((string)$action_id);
+        if (is_int($action)) {
+            $action = ActionScheduler_Store::instance()->fetch_action((string)$action);
+        }
 
         // Action must contain the sync name as hook. Else it does not belong to sync
         if (!str_contains($action->get_hook(), $this->get_sync_name())) {
