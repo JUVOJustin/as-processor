@@ -70,7 +70,7 @@ abstract class Sequential_Sync implements Syncable
 
         $data = $this->get_sync_data();
 
-        if (empty($data)) {
+        if (empty($data) || empty($data['queue'])) {
             $this->queue = new SplQueue();
         } else {
 
