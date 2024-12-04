@@ -1,7 +1,8 @@
 <?php
 
-namespace juvo\AS_Processor;
+namespace juvo\AS_Processor\Imports;
 
+use juvo\AS_Processor\Import;
 use Exception;
 use League\Csv\InvalidArgument;
 use League\Csv\Reader;
