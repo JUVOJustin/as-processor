@@ -1,46 +1,33 @@
 <?php
-
+/**
+ * Trait Chunker
+ *
+ * Provides functionality for processing data in chunks using WordPress Action Scheduler.
+ * Handles scheduling, processing, and cleanup of chunked data operations.
+ *
+ * @package juvo\AS_Processor
+ */
 namespace juvo\AS_Processor;
 
 use Exception;
 use Generator;
 use Iterator;
-use juvo\AS_Processor\Helper;
+use juvo\AS_Processor\Entities\ProcessStatus;
+use juvo\AS_Processor\Entities\Chunk;
 
+/**
+ * The Chunker.
+ */
 trait Chunker
 {
-
-    /**
-     * Generates a chunk file path
-     *
-     * @return string
-     * @throws Exception
-     */
-    private function get_chunk_path(): string
-    {
-        $filename = strtolower( "{$this->get_sync_name()}_" . microtime() );
-        $filename = preg_replace('/[^A-Za-z0-9]/', '-', "{$filename}" ) . ".txt";
-        $filename = apply_filters('as_processor/chunk/filename', $filename, $this);
-
-        $folder = $tmp = get_temp_dir();
-        $folder = apply_filters('as_processor/chunk/folder', $folder, $this);
-
-        $folder_created = wp_mkdir_p($folder);
-        if (!$folder_created) {
-            throw new Exception('Could not create chunk folder');
-        }
-
-        $path = strtolower($tmp . $filename);
-        $path = Helper::normalize_path($path);
-        return apply_filters('as_processor/chunk/path', $path, $this);
-    }
+    use DB;
 
     /**
      * Schedules an async action to process a chunk of data. Passed items are serialized and added to a chunk.
      *
-     * @param array|Iterator $chunkData
+     * @param array<mixed>|Iterator<mixed> $chunkData The data to be processed in chunks
+     * @throws Exception When chunk data insertion fails
      * @return void
-     * @throws Exception
      */
     protected function schedule_chunk(array|Iterator $chunkData): void
     {
@@ -53,20 +40,19 @@ trait Chunker
         if ( property_exists( $this, 'chunk_limit' ) && property_exists( $this, 'chunk_counter' ) && $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
             return;
         }
-        
-        $filename = $this->get_chunk_path();
 
-        // Write data to Chunk file
-        $file = fopen($filename, 'w');
-        foreach ($chunkData as $record) {
-            fwrite($file, serialize($record) . self::SERIALIZED_DELIMITER);
-        }
-        fclose($file);
+        // create the new chunk
+        $chunk = new Chunk();
+        $chunk->set_name( $this->get_sync_name() );
+        $chunk->set_group( $this->get_sync_group_name() );
+        $chunk->set_status( ProcessStatus::SCHEDULED );
+        $chunk->set_data( $chunkData );
+        $chunk->save();
 
         as_enqueue_async_action(
             $this->get_sync_name() . '/process_chunk',
             [
-                'chunk_file_path' => $filename
+                'chunk_id' => $chunk->get_chunk_id()
             ], // Wrap in array to pass as single argument. Needed because of abstract child method enforcement
             $this->get_sync_group_name()
         );
@@ -74,71 +60,97 @@ trait Chunker
 
     /**
      * Callback function for the single chunk jobs.
-     * This jobs reads the chunk file line by line and yields each line to the actual process
+     * This jobs reads the serialized chunk data from the database and processes it.
      *
-     * @param string $chunk_file_path
+     * @param int $chunk_id The ID of the chunk to process
+     * @throws Exception When chunk data is empty or invalid
      * @return void
-     * @throws Exception
      */
-    protected function import_chunk(string $chunk_file_path): void
+    protected function import_chunk(int $chunk_id): void
     {
-        if (!file_exists($chunk_file_path)) {
-            throw new Exception("File '$chunk_file_path' does not exist");
-        }
+        // set the new status of the chunk
+        $chunk = new Chunk( $chunk_id );
+        $chunk->set_status( ProcessStatus::RUNNING );
+        $chunk->save();
 
-        $file = fopen($chunk_file_path, 'r');
-        $buffer = '';
+        // fetch the data
+        $data = $chunk->get_data();
 
-        /**
-         * Always read some larger portion and check if the end delimiter is present.
-         * If not, we continue reading.
-         */
-        $formattedDataGenerator = (function() use ($file, &$buffer) {
-            $chunkSize = 8192; // Read 8 KB at a time
-            while (!feof($file)) {
-
-                // Read a chunk of data from the file and append it to the buffer
-                $buffer .= fread($file, $chunkSize);
-
-                // Check if the delimiter is present in the buffer
-                while (($pos = strpos($buffer, self::SERIALIZED_DELIMITER)) !== false) {
-
-                    // Extract the complete serialized record up to the delimiter
-                    $record = substr($buffer, 0, $pos);
-
-                    // Remove the processed record from the buffer
-                    $buffer = substr($buffer, $pos + strlen(self::SERIALIZED_DELIMITER));
-
-                    // Deserialize and yield the record if it's not empty
-                    if (!empty(trim($record))) {
-                        yield unserialize(trim($record));
-                    }
-                }
-            }
-
-            // Process any remaining data in the buffer after reading the entire file
-            if (!empty(trim($buffer))) {
-                yield unserialize(trim($buffer));
+        // Convert array to Generator
+        $generator = (function () use ($data) {
+            foreach ($data as $key => $value) {
+                yield $key => $value;
             }
         })();
 
-        $this->process_chunk_data($formattedDataGenerator);
-
-        fclose($file);
-
-        // Remove chunk file after sync
-        $unlink_result = unlink($chunk_file_path);
-        if ( $unlink_result === false ) {
-            throw new Exception("File '$chunk_file_path' could not be deleted!");
-        }
+        $this->process_chunk_data($generator);
     }
 
     /**
-     * Handles the actual data processing. Should be implemented in the class lowest in hierarchy
+     * Handles the actual data processing. Should be implemented in the class lowest in hierarchy.
      *
-     * @param Generator $chunkData
+     * @param Generator<mixed> $chunkData The generator containing chunk data to process
      * @return void
      */
     abstract function process_chunk_data(Generator $chunkData): void;
 
+    /**
+     * Schedules the cleanup job if not already scheduled.
+     * Creates a daily cron job at midnight to clean up old chunk data.
+     *
+     * @return void
+     */
+    public function schedule_chunk_cleanup(): void
+    {
+        if ( as_has_scheduled_action( 'ASP/Chunks/Cleanup' ) ) {
+			return;
+		}
+
+        // schedule the cleanup midnight every day
+		as_schedule_cron_action(
+			time(),
+			'0 0 * * *', 'ASP/Chunks/Cleanup'
+		);
+    }
+
+    /**
+     * Cleans the chunk data table from data with following properties:
+     * - older than 2 days (start)
+     * - status must be finished
+     *
+     * @return void
+     */
+    public function cleanup_chunk_data(): void
+    {
+        /**
+         * Filters the number of days to keep chunk data.
+         *
+         * @param int $interval The interval (e.g., 14*DAY_IN_SECONDS).
+         */
+        $interval = apply_filters( 'asp/chunks/cleanup/interval', 14*DAY_IN_SECONDS);
+        $cleanup_timestamp = (int) time() - $interval;
+
+        /**
+         * Filters the status of chunks to clean up.
+         *
+         * @param ProcessStatus $status The status to filter by (default: 'all').
+         */
+        $status = apply_filters('asp/chunks/cleanup/status', ProcessStatus::ALL);
+
+        $query = '';
+        if ( $status === ProcessStatus::ALL ) {
+            $query = $this->db()->prepare(
+                "DELETE FROM {$this->get_chunks_table_name()} WHERE start < %f",
+                $cleanup_timestamp
+            );
+        } else {
+            $query = $this->db()->prepare(
+                "DELETE FROM {$this->get_chunks_table_name()} WHERE status = %s AND start < %f",
+                $status->value,
+                $cleanup_timestamp
+            );
+        }
+
+        $this->db()->query( $query );
+    }
 }

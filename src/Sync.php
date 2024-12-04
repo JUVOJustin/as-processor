@@ -6,14 +6,14 @@ use ActionScheduler;
 use ActionScheduler_Action;
 use ActionScheduler_Store;
 use Exception;
+use juvo\AS_Processor\Entities\Chunk;
+use juvo\AS_Processor\Entities\ProcessStatus;
 
-abstract class Sync implements Syncable, Stats_Saver
+abstract class Sync implements Syncable
 {
 
     use Sync_Data;
     use Chunker;
-
-    const SERIALIZED_DELIMITER = "\n--END--\n";
 
     private string $sync_group_name;
 
@@ -43,6 +43,10 @@ abstract class Sync implements Syncable, Stats_Saver
         if (method_exists($this, 'on_fail')) {
             add_action($this->get_sync_name() . '/fail', [$this, 'on_fail'], 10, 3);
         }
+
+        // Hooks for chunk cleanup
+        $this->schedule_chunk_cleanup();
+        add_action( 'ASP/Chunks/Cleanup', [ $this, 'cleanup_chunk_data' ] );
     }
 
     /**
@@ -55,10 +59,10 @@ abstract class Sync implements Syncable, Stats_Saver
     /**
      * Callback for the Chunk jobs. The child implementation either dispatches to an import or an export
      *
-     * @param string $chunk_file_path
+     * @param int $chunk_id
      * @return void
      */
-    abstract function process_chunk(string $chunk_file_path): void;
+    abstract function process_chunk(int $chunk_id): void;
 
     /**
      * Returns the sync group name. If none set it will generate one from the sync name and the current time
@@ -124,16 +128,18 @@ abstract class Sync implements Syncable, Stats_Saver
             return;
         }
 
-        // Mark action as complete
-        $this->get_stats()->end_action($action_id);
+        // set the end time of the chunk
+        $action_arguments = $action->get_args();
+        if ( !empty( $action_arguments['chunk_id'] ) ) {
+            $chunk = new Chunk( $action_arguments['chunk_id'] );
+            $chunk->set_status( ProcessStatus::FINISHED );
+            $chunk->set_end( microtime(TRUE) );
+            $chunk->save();
+        }
 
         // Check if action of the same group is running or pending
         $actions = $this->get_actions(status: [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING], per_page: 1);
         if (count($actions) === 0) {
-
-            // Mark sync as complete
-            $this->get_stats()->end_sync();
-
             as_enqueue_async_action(
                 $this->get_sync_name() . '/complete',
                 [], // empty arguments array
@@ -153,19 +159,24 @@ abstract class Sync implements Syncable, Stats_Saver
      * @return void
      * @throws Exception
      */
-    public function track_action_start(int $action_id, mixed $context)
+    public function track_action_start(int $action_id, mixed $context): void
     {
         $action = $this->action_belongs_to_sync($action_id);
         if (!$action || empty($action->get_group())) {
             return;
         }
 
-        $this->sync_group_name = $action->get_group();
-
-        // Track action start if it is not the complete action
-        if (!str_contains($action->get_hook(), "/complete")) {
-            $this->get_stats()->add_action($action_id);
+        // set the start time of the chunk
+        $action_arguments = $action->get_args();
+        if ( !empty( $action_arguments['chunk_id'] ) ) {
+            $chunk = new Chunk( $action_arguments['chunk_id'] );
+            $chunk->set_status( ProcessStatus::STARTED );
+            $chunk->set_action_id( $action_id );
+            $chunk->set_start( microtime(TRUE) );
+            $chunk->save();
         }
+
+        $this->sync_group_name = $action->get_group();
     }
 
     /**
@@ -204,28 +215,15 @@ abstract class Sync implements Syncable, Stats_Saver
             return;
         }
 
-        // Update stats
-        $this->get_stats()->mark_action_as_failed($action_id, $e->getMessage());
+        // set the end time of the chunk
+        $action_arguments = $action->get_args();
+        if ( !empty( $action_arguments['chunk_id'] ) ) {
+            $chunk = new Chunk( $action_arguments['chunk_id'] );
+            $chunk->set_status( ProcessStatus::FAILED );
+            $chunk->set_end( microtime(TRUE) );
+            $chunk->save();
+        }
 
         do_action($this->get_sync_name() . '/fail', $action, $e, $action_id);
     }
-
-    /**
-     * Returns the stats object and pass this instance as saver.
-     *
-     * @throws Exception
-     */
-    public function get_stats(): Stats
-    {
-        return $this->get_sync_data('stats') ?: new Stats($this);
-    }
-
-    /**
-     * @throws Exception
-     */
-    public function save_stats(Stats $stats): void
-    {
-        $this->update_sync_data(['stats' => $stats], true, true);
-    }
-
 }
