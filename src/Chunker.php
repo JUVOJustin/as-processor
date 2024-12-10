@@ -25,11 +25,11 @@ trait Chunker
     /**
      * Schedules an async action to process a chunk of data. Passed items are serialized and added to a chunk.
      *
-     * @param array<mixed>|Iterator<mixed> $chunkData The data to be processed in chunks
+     * @param mixed $chunkData The data to be processed in chunks
      * @throws Exception When chunk data insertion fails
      * @return void
      */
-    protected function schedule_chunk(array|Iterator $chunkData): void
+    protected function schedule_chunk(mixed $chunkData): void
     {
         // update chunk counter
         if ( property_exists( $this, 'chunk_counter' ) ) {
@@ -39,6 +39,11 @@ trait Chunker
         // check if we have a chunk limit
         if ( property_exists( $this, 'chunk_limit' ) && property_exists( $this, 'chunk_counter' ) && $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
             return;
+        }
+
+        // convert to array if it's an iterator
+        if ( ! is_array( $chunkData ) ) {
+            $chunkData = iterator_to_array( $chunkData );
         }
 
         // create the new chunk
@@ -103,14 +108,14 @@ trait Chunker
     public function schedule_chunk_cleanup(): void
     {
         if ( as_has_scheduled_action( 'ASP/Chunks/Cleanup' ) ) {
-			return;
-		}
+            return;
+        }
 
         // schedule the cleanup midnight every day
-		as_schedule_cron_action(
-			time(),
-			'0 0 * * *', 'ASP/Chunks/Cleanup'
-		);
+        as_schedule_cron_action(
+            time(),
+            '0 0 * * *', 'ASP/Chunks/Cleanup'
+        );
     }
 
     /**
