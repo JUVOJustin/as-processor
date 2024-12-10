@@ -29,7 +29,9 @@ abstract class Sequential_Sync implements Syncable
         $this->sync_data_name = $this->get_sync_name();
 
         // Run always on initialisation
-        $this->queue_init();
+	    add_action( 'init', function() {
+	        $this->queue_init();
+	    });
 
         // Run the callback function once action is triggered to start the process
         add_action($this->get_sync_name(), [$this, 'callback']);
