@@ -15,8 +15,6 @@ use Iterator;
 use juvo\AS_Processor\Entities\ProcessStatus;
 use juvo\AS_Processor\Entities\Chunk;
 
-use League\Csv\MapIterator;
-
 /**
  * The Chunker.
  */
@@ -27,11 +25,11 @@ trait Chunker
     /**
      * Schedules an async action to process a chunk of data. Passed items are serialized and added to a chunk.
      *
-     * @param array<mixed>|Iterator<mixed>|MapIterator<mixed> $chunkData The data to be processed in chunks
+     * @param mixed $chunkData The data to be processed in chunks
      * @throws Exception When chunk data insertion fails
      * @return void
      */
-    protected function schedule_chunk(array|Iterator|MapIterator $chunkData): void
+    protected function schedule_chunk(mixed $chunkData): void
     {
         // update chunk counter
         if ( property_exists( $this, 'chunk_counter' ) ) {

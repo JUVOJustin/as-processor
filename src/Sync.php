@@ -45,9 +45,9 @@ abstract class Sync implements Syncable
         }
 
         // Hooks for chunk cleanup
-	    add_action( 'init', function() {
+        add_action( 'init', function() {
             $this->schedule_chunk_cleanup();
-	    });
+        });
         add_action( 'ASP/Chunks/Cleanup', [ $this, 'cleanup_chunk_data' ] );
     }
 
