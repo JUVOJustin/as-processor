@@ -43,10 +43,10 @@ trait Chunker
             return;
         }
 
-		// convert to array if it's an iterator
-	    if ( ! is_array( $chunkData ) ) {
-		    $chunkData = iterator_to_array( $chunkData );
-	    }
+        // convert to array if it's an iterator
+        if ( ! is_array( $chunkData ) ) {
+            $chunkData = iterator_to_array( $chunkData );
+        }
 
         // create the new chunk
         $chunk = new Chunk();
@@ -110,14 +110,14 @@ trait Chunker
     public function schedule_chunk_cleanup(): void
     {
         if ( as_has_scheduled_action( 'ASP/Chunks/Cleanup' ) ) {
-			return;
-		}
+            return;
+        }
 
         // schedule the cleanup midnight every day
-		as_schedule_cron_action(
-			time(),
-			'0 0 * * *', 'ASP/Chunks/Cleanup'
-		);
+        as_schedule_cron_action(
+            time(),
+            '0 0 * * *', 'ASP/Chunks/Cleanup'
+        );
     }
 
     /**
