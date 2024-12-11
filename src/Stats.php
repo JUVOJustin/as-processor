@@ -196,59 +196,61 @@ class Stats
      *
      * @return DateTimeImmutable|null
      */
-    public function get_sync_start(): ?DateTimeImmutable {
+    public function get_sync_start(): ?DateTimeImmutable
+    {
         $query = $this->db()->prepare(
-            "SELECT start 
-        FROM {$this->get_chunks_table_name()} 
-        WHERE `group` = %s 
-        AND start IS NOT NULL 
-        ORDER BY start ASC 
-        LIMIT 1",
+            "SELECT start
+            FROM {$this->get_chunks_table_name()}
+            WHERE `group` = %s
+            AND start IS NOT NULL
+            ORDER BY start ASC
+            LIMIT 1",
             $this->group_name
         );
-
+        
         $start = $this->db()->get_var($query);
-
+        
         if (empty($start)) {
             return null;
         }
-
-        // Split microtime string into seconds and microseconds
-        [$microseconds, $seconds] = explode(' ', $start);
-
+        
+        // Split the timestamp into seconds and microseconds
+        [$seconds, $microseconds] = explode('.', (string) $start);
+        
         // Create datetime from unix timestamp and add microseconds
         return (new DateTimeImmutable('@' . $seconds))
-            ->modify(sprintf('+%f seconds', $microseconds));
+            ->modify(sprintf('+0.%s seconds', $microseconds));
     }
-
+    
     /**
      * Gets the sync end time.
      *
      * @return DateTimeImmutable|null
      */
-    public function get_sync_end(): ?DateTimeImmutable {
+    public function get_sync_end(): ?DateTimeImmutable
+    {
         $query = $this->db()->prepare(
-            "SELECT end 
-        FROM {$this->get_chunks_table_name()} 
-        WHERE `group` = %s 
-        AND end IS NOT NULL 
-        ORDER BY end DESC 
-        LIMIT 1",
+            "SELECT end
+            FROM {$this->get_chunks_table_name()}
+            WHERE `group` = %s
+            AND end IS NOT NULL
+            ORDER BY end DESC
+            LIMIT 1",
             $this->group_name
         );
-
+        
         $end = $this->db()->get_var($query);
-
+        
         if (empty($end)) {
             return null;
         }
-
-        // Split microtime string into seconds and microseconds
-        [$microseconds, $seconds] = explode(' ', $end);
-
+        
+        // Split the timestamp into seconds and microseconds
+        [$seconds, $microseconds] = explode('.', (string) $end);
+        
         // Create datetime from unix timestamp and add microseconds
         return (new DateTimeImmutable('@' . $seconds))
-            ->modify(sprintf('+%f seconds', $microseconds));
+            ->modify(sprintf('+0.%s seconds', $microseconds));
     }
 
     /**
