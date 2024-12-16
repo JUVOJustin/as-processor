@@ -146,4 +146,88 @@ class Helper
         $separator = _x( ', ', 'Human time diff separator', 'as-processor' );
         return implode( $separator, $time_strings );
     }
+
+    /**
+     * Merges two arrays with options for deep merging and array concatenation.
+     *
+     * @param array $array1 The original array.
+     * @param array $array2 The array to merge into the original array.
+     * @param bool $deepMerge Optional. Flag to control deep merging. Default is true.
+     * @param bool $concatArrays Optional. Flag to control array concatenation. Default is false.
+     * @return array The merged array.
+     */
+    public static function merge_arrays(array $array1, array $array2, bool $deepMerge = true, bool $concatArrays = false): array
+    {
+        foreach ($array2 as $key => $value) {
+            if (!isset($array1[$key]) || (!is_array($value) && !is_array($array1[$key]))) {
+                // If the key doesn't exist in array1 or either value is not an array, simply use the value from array2
+                $array1[$key] = $value;
+            } elseif (is_array($value) && is_array($array1[$key])) {
+                // Both values are arrays, merge them based on the merge strategy
+                $array1[$key] = self::merge_array_values($array1[$key], $value, $deepMerge, $concatArrays);
+            } else {
+                // If types don't match (one is array, the other is not), use the value from array2
+                $array1[$key] = $value;
+            }
+        }
+
+        return $array1;
+    }
+
+    /**
+     * Merges two array values based on the merge strategy.
+     *
+     * @param array $value1 The original array value.
+     * @param array $value2 The array value to merge into the original.
+     * @param bool $deepMerge Flag to control deep merging.
+     * @param bool $concatArrays Flag to control array concatenation.
+     * @return array The merged array value.
+     */
+    public static function merge_array_values(array $value1, array $value2, bool $deepMerge, bool $concatArrays): array
+    {
+        $bothIndexed = self::is_indexed_array($value1) && self::is_indexed_array($value2);
+
+        if (!$deepMerge) {
+            return self::shallow_merge($value1, $value2, $bothIndexed, $concatArrays);
+        }
+
+        if ($bothIndexed) {
+            return $concatArrays ? array_merge($value1, $value2) : $value2;
+        }
+
+        return self::merge_arrays($value1, $value2, true, $concatArrays);
+    }
+
+    /**
+     * Performs a shallow merge of two arrays.
+     *
+     * @param array $value1 The original array value.
+     * @param array $value2 The array value to merge into the original.
+     * @param bool $bothIndexed Whether both arrays are indexed.
+     * @param bool $concatArrays Flag to control array concatenation.
+     * @return array The shallow-merged array.
+     */
+    public static function shallow_merge(array $value1, array $value2, bool $bothIndexed, bool $concatArrays): array
+    {
+        if ($bothIndexed) {
+            return $concatArrays ? array_merge($value1, $value2) : $value2;
+        }
+
+        // For associative arrays, merge at the top level
+        return $value2 + $value1;
+    }
+
+    /**
+     * Checks if an array is an indexed array (not associative).
+     *
+     * @param array $array The array to check.
+     * @return bool True if the array is indexed, false otherwise.
+     */
+    public static function is_indexed_array(array $array): bool
+    {
+        if (empty($array)) {
+            return true; // Consider empty arrays as indexed
+        }
+        return array_keys($array) === range(0, count($array) - 1);
+    }
 }
