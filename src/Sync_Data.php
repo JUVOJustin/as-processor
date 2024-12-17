@@ -131,15 +131,6 @@ trait Sync_Data
 
         // Store the actual data
         set_transient($this->get_sync_data_name() . '_' . $key, $data, $expiration);
-
-        // Manage the keys transient
-        $keys_transient_name = $this->get_sync_data_name() . '_keys';
-        $keys = $this->get_transient($keys_transient_name) ?: [];
-
-        if (!in_array($key, $keys)) {
-            $keys[] = $key;
-            set_transient($keys_transient_name, $keys, $expiration);
-        }
     }
 
     /**
@@ -249,17 +240,22 @@ trait Sync_Data
      */
     public function delete_sync_data(): void
     {
-        // Retrieve the list of keys stored in the keys transient
-        $keys_transient_name = $this->get_sync_data_name() . '_keys';
-        $keys = $this->get_transient($keys_transient_name) ?: [];
+        global $wpdb;
 
-        // Delete each individual transient associated with these keys
-        foreach ($keys as $key) {
-            delete_transient($this->get_sync_data_name() . '_' . $key);
-        }
+        // Define the base name of your transient
+        $base_transient_name = $this->get_sync_data_name() . '_';
 
-        // Delete the keys transient itself
-        delete_transient($keys_transient_name);
+        // Prepare the like pattern for SQL, escaping wildcards and adding the wildcard placeholder
+        $like_pattern = $wpdb->esc_like('_transient_' . $base_transient_name) . '%';
+
+        // Use $wpdb to directly delete transients from the wp_options table
+        $wpdb->query(
+            $wpdb->prepare("
+                DELETE FROM $wpdb->options
+                WHERE option_name LIKE %s
+                ", $like_pattern
+            )
+        );
     }
 
     protected function is_key_locked_by_current_process(string $key): bool
