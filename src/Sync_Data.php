@@ -34,6 +34,10 @@ trait Sync_Data
                     return false;
                 }
 
+                if (is_array($transient) && 1 === count($transient)) {
+                    return $transient[0];
+                }
+
                 return $transient;
             } catch (Exception $e) {
                 $attempts++;
@@ -177,6 +181,10 @@ trait Sync_Data
                 // If there's no existing data, treat it as an empty array.
                 if (!is_array($currentData)) {
                     $currentData = [];
+                }
+
+                if (!is_array($updates)) {
+                    $updates = [$updates];
                 }
 
                 // Merge the new updates into the current data, respecting the deepMerge and concatArrays flags.
