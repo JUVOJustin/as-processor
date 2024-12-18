@@ -5,7 +5,7 @@
  * Modified by Justin Vogt on 18-December-2024 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
-namespace Sinnewerk\Dependencies\juvo\AS_Processor;
+namespace juvo\AS_Processor;
 
 use DateTimeImmutable;
 
