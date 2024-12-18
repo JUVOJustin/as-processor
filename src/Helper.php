@@ -1,6 +1,11 @@
 <?php
+/**
+ * @license GPL-3.0-or-later
+ *
+ * Modified by Justin Vogt on 18-December-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ */
 
-namespace juvo\AS_Processor;
+namespace Sinnewerk\Dependencies\juvo\AS_Processor;
 
 use DateTimeImmutable;
 
@@ -158,16 +163,22 @@ class Helper
      */
     public static function merge_arrays(array $array1, array $array2, bool $deepMerge = true, bool $concatArrays = false): array
     {
-        foreach ($array2 as $key => $value) {
-            if (!isset($array1[$key]) || (!is_array($value) && !is_array($array1[$key]))) {
-                // If the key doesn't exist in array1 or either value is not an array, simply use the value from array2
-                $array1[$key] = $value;
-            } elseif (is_array($value) && is_array($array1[$key])) {
-                // Both values are arrays, merge them based on the merge strategy
-                $array1[$key] = self::merge_array_values($array1[$key], $value, $deepMerge, $concatArrays);
-            } else {
-                // If types don't match (one is array, the other is not), use the value from array2
-                $array1[$key] = $value;
+        // Check if both arrays are flat
+        if (self::is_flat_array($array1) && self::is_flat_array($array2)) {
+            // Use array_merge for flat arrays
+            return array_merge($array1, $array2);
+        } else {
+            foreach ($array2 as $key => $value) {
+                if (!isset($array1[$key]) || (!is_array($value) && !is_array($array1[$key]))) {
+                    // If the key doesn't exist in array1 or either value is not an array, simply use the value from array2
+                    $array1[$key] = $value;
+                } elseif (is_array($value) && is_array($array1[$key])) {
+                    // Both values are arrays, merge them based on the merge strategy
+                    $array1[$key] = self::merge_array_values($array1[$key], $value, $deepMerge, $concatArrays);
+                } else {
+                    // If types don't match (one is array, the other is not), use the value from array2
+                    $array1[$key] = $value;
+                }
             }
         }
 
@@ -230,4 +241,22 @@ class Helper
         }
         return array_keys($array) === range(0, count($array) - 1);
     }
+
+    /**
+     * Determines if a given array is a flat array.
+     *
+     * An array is considered flat if none of its elements are arrays.
+     *
+     * @param array<mixed> $array The array to be checked.
+     * @return bool Returns true if the array is flat, false otherwise.
+     */
+    public static function is_flat_array(array $array): bool {
+        foreach ($array as $value) {
+            if (is_array($value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 }
