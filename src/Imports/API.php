@@ -116,10 +116,8 @@ abstract class API extends Import
             }
         }
 
-        $this->update_sync_data([
-            'pending_items' => $items,
-            'last_request'  => microtime(true),
-        ]);
+        $this->update_sync_data('pending_items', $items);
+        $this->update_sync_data('last_request', microtime(true));
     }
 
     /**

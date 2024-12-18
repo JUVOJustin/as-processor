@@ -8,7 +8,7 @@ trait Sync_Data
 {
 
     private string $sync_data_name;
-    private bool $locked_by_current_process = false;
+    private array $locked_by_current_process = [];
 
     /**
      * Returns the sync data from a transient
@@ -17,83 +17,83 @@ trait Sync_Data
      * @return mixed
      * @throws \Exception
      */
-    protected function get_sync_data(string $key = ""): mixed
-    {
-
+    protected function get_sync_data(string $key): mixed {
         $attempts = 0;
+
         do {
             try {
-
-                if ($this->is_locked() && !$this->locked_by_current_process) {
+                // Check if the specific key is locked and determine if the current process holds the lock
+                if ($this->is_locked($key) && !$this->is_key_locked_by_current_process($key)) {
                     throw new \Exception('Sync Data is locked');
                 }
 
-                $transient = $this->get_transient($this->get_sync_data_name());
+                $transient = $this->get_transient($this->get_sync_data_name() . '_' . $key);
+
+                // Return false if there's no data
                 if (empty($transient)) {
                     return false;
                 }
 
-                if (empty($key)) {
-                    return $transient;
+                if (is_array($transient) && 1 === count($transient)) {
+                    return $transient[0];
                 }
 
-                if (isset($transient[$key])) {
-                    return $transient[$key];
-                }
-
-                return false;
+                return $transient;
             } catch (Exception $e) {
                 $attempts++;
                 sleep(1);
                 continue;
             }
-        } while($attempts < 5);
+        } while ($attempts < 5);
 
-        $attempts = $attempts +1; // Adjust counting for final error
+        $attempts = $attempts + 1; // Adjust counting for final error
         throw new \Exception("Sync Data is locked. Tried {$attempts} times");
     }
 
     /**
-     * Attempts to acquire a lock and returns true if successful.
+     * Acquires a synchronization lock to ensure exclusive access.
      *
+     * This method attempts to set a transient lock to synchronize certain operations.
+     * If a lock already exists, it throws an exception to prevent concurrent access.
+     *
+     * @param string $key The unique identifier for the lock.
+     * @param int $lock_ttl Optional. The time-to-live for the lock in seconds. Defaults to 5 minutes.
+     * @return bool Returns true if the lock is successfully acquired.
      * @throws Exception If the lock is already acquired.
-     *
-     * @return bool True if the lock was acquired, false otherwise.
      */
-    protected function acquire(int $lock_ttl = 5*MINUTE_IN_SECONDS): bool
+    protected function acquire(string $key, int $lock_ttl = 5*MINUTE_IN_SECONDS): bool
     {
-        $lock = $this->get_transient( $this->get_sync_data_name() . '_lock' );
+        $lock = $this->get_transient($this->get_sync_data_name() . '_' . $key . '_lock');
         if ($lock) {
-            throw new Exception( 'Lock is already acquired' );
+            throw new Exception('Lock is already acquired');
         }
-        set_transient( $this->get_sync_data_name() . '_lock', true, $lock_ttl );
-        $this->locked_by_current_process = true;
+        set_transient($this->get_sync_data_name() . '_' . $key . '_lock', true, $lock_ttl);
+        $this->set_key_lock($key, true);
         return true;
     }
 
     /**
      * Releases a lock that was previously acquired.
      *
+     * @param string $key
      * @return void
      */
-    protected function release(): void
+    protected function release( string $key ): void
     {
-        delete_transient( $this->get_sync_data_name() . '_lock' );
-        $this->locked_by_current_process = false;
+        delete_transient($this->get_sync_data_name() . '_' . $key . '_lock');
+        $this->set_key_lock($key, false);
     }
 
     /**
      * Checks if a lock is currently held.
      *
+     * @param string $key The key of the transient
      * @return bool True if the lock is held, false otherwise.
      */
-    protected function is_locked(): bool
+    protected function is_locked(string $key): bool
     {
-        if ($this->locked_by_current_process) {
-            return true;
-        }
-
-        return (bool) $this->get_transient( $this->get_sync_data_name() . '_lock' );
+        return $this->is_key_locked_by_current_process($key) ||
+            (bool) $this->get_transient($this->get_sync_data_name() . '_' . $key . '_lock');
     }
 
     /**
@@ -121,18 +121,20 @@ trait Sync_Data
      * Stores data in a transient to be access in other jobs.
      * This can be used e.g. to build a delta of post ids
      *
+     * @param string $key
      * @param array $data
      * @param int $expiration
      * @return void
      * @throws Exception
      */
-    protected function set_sync_data(array $data, int $expiration = HOUR_IN_SECONDS * 6): void
+    protected function set_sync_data(string $key, array $data, int $expiration = HOUR_IN_SECONDS * 6): void
     {
-        if ($this->is_locked() && !$this->locked_by_current_process) {
+        if ($this->is_locked($key) && !$this->locked_by_current_process) {
             throw new \Exception('Sync Data is locked');
         }
 
-        set_transient($this->get_sync_data_name(), $data, $expiration);
+        // Store the actual data
+        set_transient($this->get_sync_data_name() . '_' . $key, $data, $expiration);
     }
 
     /**
@@ -150,7 +152,8 @@ trait Sync_Data
      *
      * If a lock is set a wait of 1 second is set. After 5 failed tries a final error is thrown
      *
-     * @param array $updates Associative array of data to update.
+     * @param string $key The key of the sync data transient
+     * @param mixed $updates The data to update.
      * @param int $expiration Optional. Expiration time in seconds. Default is 6 hours.
      * @param bool $deepMerge Optional. Flag to control deep merging. Default is true.
      *                        - true: Recursively merge nested arrays.
@@ -161,7 +164,7 @@ trait Sync_Data
      * @return void
      * @throws Exception
      */
-    protected function update_sync_data(array $updates,bool $deepMerge = false, bool $concatArrays = false, int $expiration = HOUR_IN_SECONDS * 6): void
+    protected function update_sync_data(string $key, mixed $updates,bool $deepMerge = false, bool $concatArrays = false, int $expiration = HOUR_IN_SECONDS * 6): void
     {
 
         $attempts = 0;
@@ -170,24 +173,28 @@ trait Sync_Data
         do {
             try {
                 // Lock data first
-                $this->acquire();
+                $this->acquire( $key );
 
                 // Retrieve the current transient data.
-                $currentData = $this->get_sync_data();
+                $currentData = $this->get_sync_data( $key );
 
                 // If there's no existing data, treat it as an empty array.
                 if (!is_array($currentData)) {
                     $currentData = [];
                 }
 
+                if (!is_array($updates)) {
+                    $updates = [$updates];
+                }
+
                 // Merge the new updates into the current data, respecting the deepMerge and concatArrays flags.
-                $newData = $this->mergeArrays($currentData, $updates, $deepMerge, $concatArrays);
+                $newData = Helper::merge_arrays($currentData, $updates, $deepMerge, $concatArrays);
 
                 // Save the updated data back into the transient.
-                $this->set_sync_data($newData, $expiration);
+                $this->set_sync_data($key, $newData, $expiration);
 
                 // Unlock
-                $this->release();
+                $this->release($key);
                 return;
             } catch (Exception $e) {
                 $attempts++;
@@ -198,90 +205,6 @@ trait Sync_Data
 
         // If this point is reached throw error
         throw new \Exception("Failed to update sync data after $attempts tries");
-    }
-
-    /**
-     * Merges two arrays with options for deep merging and array concatenation.
-     *
-     * @param array $array1 The original array.
-     * @param array $array2 The array to merge into the original array.
-     * @param bool $deepMerge Optional. Flag to control deep merging. Default is true.
-     * @param bool $concatArrays Optional. Flag to control array concatenation. Default is false.
-     * @return array The merged array.
-     */
-    private function mergeArrays(array $array1, array $array2, bool $deepMerge = true, bool $concatArrays = false): array
-    {
-        foreach ($array2 as $key => $value) {
-            if (!isset($array1[$key]) || (!is_array($value) && !is_array($array1[$key]))) {
-                // If the key doesn't exist in array1 or either value is not an array, simply use the value from array2
-                $array1[$key] = $value;
-            } elseif (is_array($value) && is_array($array1[$key])) {
-                // Both values are arrays, merge them based on the merge strategy
-                $array1[$key] = $this->mergeArrayValues($array1[$key], $value, $deepMerge, $concatArrays);
-            } else {
-                // If types don't match (one is array, the other is not), use the value from array2
-                $array1[$key] = $value;
-            }
-        }
-
-        return $array1;
-    }
-
-    /**
-     * Merges two array values based on the merge strategy.
-     *
-     * @param array $value1 The original array value.
-     * @param array $value2 The array value to merge into the original.
-     * @param bool $deepMerge Flag to control deep merging.
-     * @param bool $concatArrays Flag to control array concatenation.
-     * @return array The merged array value.
-     */
-    private function mergeArrayValues(array $value1, array $value2, bool $deepMerge, bool $concatArrays): array
-    {
-        $bothIndexed = $this->isIndexedArray($value1) && $this->isIndexedArray($value2);
-
-        if (!$deepMerge) {
-            return $this->shallowMerge($value1, $value2, $bothIndexed, $concatArrays);
-        }
-
-        if ($bothIndexed) {
-            return $concatArrays ? array_merge($value1, $value2) : $value2;
-        }
-
-        return $this->mergeArrays($value1, $value2, true, $concatArrays);
-    }
-
-    /**
-     * Performs a shallow merge of two arrays.
-     *
-     * @param array $value1 The original array value.
-     * @param array $value2 The array value to merge into the original.
-     * @param bool $bothIndexed Whether both arrays are indexed.
-     * @param bool $concatArrays Flag to control array concatenation.
-     * @return array The shallow-merged array.
-     */
-    private function shallowMerge(array $value1, array $value2, bool $bothIndexed, bool $concatArrays): array
-    {
-        if ($bothIndexed) {
-            return $concatArrays ? array_merge($value1, $value2) : $value2;
-        }
-
-        // For associative arrays, merge at the top level
-        return $value2 + $value1;
-    }
-
-    /**
-     * Checks if an array is an indexed array (not associative).
-     *
-     * @param array $array The array to check.
-     * @return bool True if the array is indexed, false otherwise.
-     */
-    private function isIndexedArray(array $array): bool
-    {
-        if (empty($array)) {
-            return true; // Consider empty arrays as indexed
-        }
-        return array_keys($array) === range(0, count($array) - 1);
     }
 
     /**
@@ -325,7 +248,31 @@ trait Sync_Data
      */
     public function delete_sync_data(): void
     {
-        delete_transient($this->get_sync_data_name());
+        global $wpdb;
+
+        // Define the base name of your transient
+        $base_transient_name = $this->get_sync_data_name() . '_';
+
+        // Prepare the like pattern for SQL, escaping wildcards and adding the wildcard placeholder
+        $like_pattern = $wpdb->esc_like('_transient_' . $base_transient_name) . '%';
+
+        // Use $wpdb to directly delete transients from the wp_options table
+        $wpdb->query(
+            $wpdb->prepare("
+                DELETE FROM $wpdb->options
+                WHERE option_name LIKE %s
+                ", $like_pattern
+            )
+        );
     }
 
+    protected function is_key_locked_by_current_process(string $key): bool
+    {
+        return isset($this->locked_by_current_process[$key]) && $this->locked_by_current_process[$key];
+    }
+
+    protected function set_key_lock(string $key, bool $state): void
+    {
+        $this->locked_by_current_process[$key] = $state;
+    }
 }
