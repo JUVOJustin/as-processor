@@ -1,9 +1,4 @@
 <?php
-/**
- * @license GPL-3.0-or-later
- *
- * Modified by Justin Vogt on 18-December-2024 using {@see https://github.com/BrianHenryIE/strauss}.
- */
 
 namespace juvo\AS_Processor;
 
@@ -157,16 +152,15 @@ class Helper
      *
      * @param array $array1 The original array.
      * @param array $array2 The array to merge into the original array.
-     * @param bool $deepMerge Optional. Flag to control deep merging. Default is true.
+     * @param bool $deepMerge Optional. Flag to control deep merging. Default is false.
      * @param bool $concatArrays Optional. Flag to control array concatenation. Default is false.
      * @return array The merged array.
      */
-    public static function merge_arrays(array $array1, array $array2, bool $deepMerge = true, bool $concatArrays = false): array
+    public static function merge_arrays(array $array1, array $array2, bool $deepMerge = false, bool $concatArrays = false): array
     {
         // Check if both arrays are flat
         if (self::is_flat_array($array1) && self::is_flat_array($array2)) {
-            // Use array_merge for flat arrays
-            return array_merge($array1, $array2);
+			return array_merge($array1, $array2);
         } else {
             foreach ($array2 as $key => $value) {
                 if (!isset($array1[$key]) || (!is_array($value) && !is_array($array1[$key]))) {
