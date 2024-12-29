@@ -3,7 +3,6 @@
 namespace juvo\AS_Processor;
 
 use DateTimeImmutable;
-use WP_Filesystem_Direct;
 
 class Helper
 {
@@ -17,10 +16,11 @@ class Helper
 	 */
 	public static function get_direct_filesystem(): \WP_Filesystem_Direct {
 		if (!class_exists( 'WP_Filesystem_Direct' )) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
+			WP_Filesystem();
+			require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php';
 		}
 
-		return new WP_Filesystem_Direct(null);
+		return new \WP_Filesystem_Direct(null);
 	}
 
     /**
