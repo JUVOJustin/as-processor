@@ -70,15 +70,16 @@ abstract class Sequential_Sync implements Syncable
     private function retrieve_data(): void
     {
 
-        $data = $this->get_sync_data();
+        $queue = $this->get_sync_data('queue');
+        $current_sync = $this->get_sync_data('current_sync');
 
-        if (empty($data) || empty($data['queue'])) {
+        if (empty($queue)) {
             $this->queue = new SplQueue();
         } else {
 
             // Restore data from run
-            $this->queue = $data['queue'];
-            $this->current_sync = $data['current_sync'] ?? null;
+            $this->queue = $queue;
+            $this->current_sync = $current_sync ?? null;
         }
     }
 
@@ -100,10 +101,8 @@ abstract class Sequential_Sync implements Syncable
 
                 // Reset data
                 $this->current_sync = null;
-                $this->update_sync_data([
-                    'queue' => $this->queue,
-                    'current_sync' => null
-                ]);
+                $this->update_sync_data( 'queue', $this->queue );
+                $this->update_sync_data( 'current_sync', null );
 
                 // Allow working on data after sync is complete
                 do_action($this->get_sync_name() . '/complete');
@@ -115,10 +114,8 @@ abstract class Sequential_Sync implements Syncable
         $this->current_sync = $sync;
 
         // Save current queue back to db
-        $this->update_sync_data([
-            'queue' => $this->queue,
-            'current_sync' => $this->current_sync
-        ]);
+        $this->update_sync_data( 'queue', $this->queue);
+        $this->update_sync_data( 'current_sync', $this->current_sync);
 
         // Execute Sync
         do_action($this->current_sync->get_sync_name());
@@ -171,9 +168,8 @@ abstract class Sequential_Sync implements Syncable
         }
 
         $this->queue->enqueue($task);
-        $this->update_sync_data([
-            'queue' => $this->queue,
-        ]);
+
+        $this->update_sync_data( 'queue', $this->queue );
 
         return true;
     }
