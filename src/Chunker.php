@@ -11,7 +11,6 @@ namespace juvo\AS_Processor;
 
 use Exception;
 use Generator;
-use Iterator;
 use juvo\AS_Processor\Entities\ProcessStatus;
 use juvo\AS_Processor\Entities\Chunk;
 
