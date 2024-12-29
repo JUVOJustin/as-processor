@@ -3,9 +3,26 @@
 namespace juvo\AS_Processor;
 
 use DateTimeImmutable;
+use WP_Filesystem_Direct;
 
 class Helper
 {
+
+	/**
+	 * Retrieves an instance of the WP_Filesystem_Direct class.
+	 *
+	 * Ensures the WP_Filesystem_Direct class is loaded and returns its instance.
+	 *
+	 * @return \WP_Filesystem_Direct Returns an instance of the WP_Filesystem_Direct class.
+	 */
+	public static function get_direct_filesystem(): \WP_Filesystem_Direct {
+		if (!class_exists( 'WP_Filesystem_Direct' )) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+
+		return new WP_Filesystem_Direct(null);
+	}
+
     /**
      * Standardizes a file path to use forward slashes and removes redundant slashes.
      *
@@ -27,12 +44,13 @@ class Helper
         return $path;
     }
 
-    /**
-     * Converts a microtime float to a DateTimeImmutable
-     *
-     * @param float|null $microtime The microtime from microtime(true)
-     * @return DateTimeImmutable|null
-     */
+	/**
+	 * Converts a microtime float to a DateTimeImmutable
+	 *
+	 * @param float|null $microtime The microtime from microtime(true)
+	 * @return DateTimeImmutable|null
+	 * @throws \DateMalformedStringException
+	 */
     public static function convert_microtime_to_datetime(?float $microtime): ?DateTimeImmutable
     {
         if (null === $microtime) {

@@ -2,6 +2,7 @@
 
 namespace juvo\AS_Processor\Imports;
 
+use juvo\AS_Processor\Helper;
 use juvo\AS_Processor\Import;
 use Exception;
 use League\Csv\InvalidArgument;
@@ -16,7 +17,7 @@ abstract class CSV_Sync extends Import
     protected bool $hasHeader = true;
     protected string $srcEncoding = "";
 
-    abstract protected function get_source_csv_path(): string;
+    abstract protected function get_source_path(): string;
 
     /**
      * Takes the source csv and splits it into chunk files that contain the set amount of items
@@ -31,13 +32,15 @@ abstract class CSV_Sync extends Import
     public function split_data_into_chunks(): void
     {
 
-        $csvFilePath = $this->get_source_csv_path();
-        if (!file_exists($csvFilePath)) {
-            throw new Exception("Failed to open the file: $csvFilePath");
+        $filepath = $this->get_source_path();
+		$wp_filesystem = Helper::get_direct_filesystem();
+
+        if (!$wp_filesystem->is_file($filepath)) {
+            throw new Exception("Failed to open the file: $filepath");
         }
 
         // Read csv from file
-        $reader = Reader::createFromPath($this->get_source_csv_path(), 'r');
+        $reader = Reader::createFromPath($this->get_source_path(), 'r');
         $reader->setDelimiter($this->delimiter);
 
         // If src encoding is set convert table to utf-8
@@ -56,9 +59,9 @@ abstract class CSV_Sync extends Import
         }
 
         // Remove chunk file after sync
-        $unlink_result = unlink($csvFilePath);
+		$unlink_result = Helper::get_direct_filesystem()->delete($filepath);
         if ( $unlink_result === false ) {
-            throw new Exception("File '$csvFilePath' could not be deleted!");
+            throw new Exception("File '$filepath' could not be deleted!");
         }
     }
 }

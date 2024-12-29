@@ -2,6 +2,7 @@
 
 namespace juvo\AS_Processor\Imports;
 use Exception;
+use juvo\AS_Processor\Helper;
 use juvo\AS_Processor\Import;
 use PhpOffice\PhpSpreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\CellIterator;
@@ -49,7 +50,7 @@ abstract class Excel extends Import
      *
      * @return  string
      */
-    abstract function get_source_filepath(): string;
+    abstract function get_source_path(): string;
 
 	/**
 	 * Splits the excel files into chunks and schedules them
@@ -59,10 +60,12 @@ abstract class Excel extends Import
 	 */
     public function split_data_into_chunks(): void
 	{
-        $filepath = $this->get_source_filepath();
-        if (!file_exists($filepath)) {
-            throw new Exception("Failed to open the file: $filepath");
-        }
+		$filepath = $this->get_source_path();
+		$wp_filesystem = Helper::get_direct_filesystem();
+
+		if (!$wp_filesystem->is_file($filepath)) {
+			throw new Exception("Failed to open the file: $filepath");
+		}
 
         $reader = PhpSpreadsheet\IOFactory::createReader("Xlsx");
         $spreadsheet = $reader->load($filepath);
@@ -136,9 +139,9 @@ abstract class Excel extends Import
             $this->schedule_chunk($chunkData);
         }
 
-        $unlink_result = unlink($filepath);
-        if ( $unlink_result === false ) {
-            throw new Exception("File '$filepath' could not be deleted!");
-        }
+		$unlink_result = Helper::get_direct_filesystem()->delete($filepath);
+		if ( $unlink_result === false ) {
+			throw new Exception("File '$filepath' could not be deleted!");
+		}
     }
 }
