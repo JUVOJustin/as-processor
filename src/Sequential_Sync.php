@@ -1,9 +1,23 @@
 <?php
+/**
+ * Allows adding syncs in a sequence to ensure execution in the proper order
+ *
+ * @package juvo/as-processor
+ */
 
 namespace juvo\AS_Processor;
 
+use Exception;
 use SplQueue;
 
+/**
+ * Class Sequential_Sync
+ *
+ * Base class responsible for managing the execution of sequential sync tasks.
+ * It organizes tasks in a queue and manages their execution in a predefined sequence.
+ * The class ensures that each task in the sequence is properly handled and allows
+ * for the registration of hooks for sync-specific operations.
+ */
 abstract class Sequential_Sync implements Syncable {
 
 
@@ -16,6 +30,42 @@ abstract class Sequential_Sync implements Syncable {
 	 */
 	private SplQueue $queue;
 
+	/**
+	 * Stores the sequence of sync jobs to be executed.
+	 *
+	 * This array holds instances of the `Sync` class, each representing a specific synchronization job
+	 * that is part of a sequential synchronization process. The `$jobs` array is initialized with the
+	 * sync tasks returned by the `get_jobs()` method, which needs to be implemented by classes extending
+	 * from `Sequential_Sync`.
+	 *
+	 * ### Purpose:
+	 * - The `$jobs` variable ensures that all synchronization jobs are loaded and managed as part of the
+	 *   sequence. These jobs are not instantiated on every page load but only when the synchronization
+	 *   process is initiated, keeping resource usage efficient.
+	 *
+	 * ### Usage:
+	 * - The `queue_init()` method initializes this property with the return value of `get_jobs()`
+	 *   and registers hooks for each job’s specific sync behavior.
+	 * - It provides the functionality to enqueue and process these jobs in the correct order during
+	 *   the synchronization cycle.
+	 * - The jobs can communicate and share synchronization data through the `sync_data_name` property
+	 *   and hooks registered for actions like job completion or intermediate steps.
+	 *
+	 * ### When to Use:
+	 * - Use `$jobs` when scheduling or managing multiple sync tasks as part of a sequential process.
+	 * - Any job that needs to be executed as part of the sequence must be registered in the array via
+	 *   the `get_jobs()` method.
+	 * - It is especially useful for applications where sync tasks must follow a specific logical order
+	 *   for successful execution.
+	 *
+	 * ### Example Use Case:
+	 * - Suppose you have a series of data synchronization tasks where data from one sync operation is
+	 *   necessary for the next. You would define these tasks as instances of `Sync` and return them in
+	 *   `get_jobs()`. They are then stored in `$jobs` and executed sequentially, ensuring proper order
+	 *   and data integrity.
+	 *
+	 * @var Sync[] Array of `Sync` instances representing the jobs to be executed sequentially.
+	 */
 	private array $jobs;
 
 	/**
@@ -25,6 +75,12 @@ abstract class Sequential_Sync implements Syncable {
 	 */
 	private ?Sync $current_sync = null;
 
+	/**
+	 * Constructor method to initialize synchronization data name
+	 * and register hooks for processing the synchronization sequence.
+	 *
+	 * @return void
+	 */
 	public function __construct() {
 		$this->sync_data_name = $this->get_sync_name();
 
@@ -67,7 +123,7 @@ abstract class Sequential_Sync implements Syncable {
 	 * Retrieves and restores data for the sync process.
 	 *
 	 * @return void
-	 * @throws \Exception
+	 * @throws Exception DB Error.
 	 */
 	private function retrieve_data(): void {
 
@@ -87,7 +143,7 @@ abstract class Sequential_Sync implements Syncable {
 	/**
 	 * Runs the next job in the queue
 	 *
-	 * @throws \Exception
+	 * @throws Exception DB Error.
 	 */
 	public function next(): void {
 
@@ -128,7 +184,7 @@ abstract class Sequential_Sync implements Syncable {
 	 * Starts the job processing.
 	 *
 	 * @return void
-	 * @throws \Exception
+	 * @throws Exception DB Error.
 	 */
 	public function callback(): void {
 
@@ -137,7 +193,7 @@ abstract class Sequential_Sync implements Syncable {
 
 		// Check if is already running
 		if ( $this->current_sync ) {
-			throw new \Exception( 'Sync already started' );
+			throw new Exception( 'Sync already started' );
 		}
 
 		$jobs = $this->jobs;
@@ -155,9 +211,9 @@ abstract class Sequential_Sync implements Syncable {
 	/**
 	 * Adds a task to the queue
 	 *
-	 * @param Sync $task Task to be added, could be a callback or any data type representing a task
+	 * @param Sync $task Task to be added, could be a callback or any data type representing a task.
 	 * @return bool
-	 * @throws \Exception
+	 * @throws Exception DB Error.
 	 */
 	private function enqueue( Sync $task ): bool {
 

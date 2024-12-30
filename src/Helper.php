@@ -9,6 +9,7 @@
 namespace juvo\AS_Processor;
 
 use DateTimeImmutable;
+use Exception;
 
 /**
  * Class Helper
@@ -63,7 +64,7 @@ class Helper {
 	 *
 	 * @param float|null $microtime The microtime value to convert, or null.
 	 * @return DateTimeImmutable|null Returns a DateTimeImmutable object representing the given microtime value, or null if input is null.
-	 * @throws \DateMalformedStringException Unparsable date format.
+	 * @throws Exception Unparsable date format.
 	 */
 	public static function convert_microtime_to_datetime( ?float $microtime ): ?DateTimeImmutable {
 		if ( null === $microtime ) {

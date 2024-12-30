@@ -1,4 +1,13 @@
 <?php
+/**
+ * Interface Syncable
+ *
+ * Defines the contract for objects that are capable of being synchronized.
+ * Provides methods for retrieving the name of the sync operation and for scheduling
+ * synchronization tasks.
+ *
+ * @package juvo/as-processor
+ */
 
 namespace juvo\AS_Processor;
 
@@ -18,5 +27,5 @@ interface Syncable {
 	 *
 	 * @return void
 	 */
-	function schedule(): void;
+	public function schedule(): void;
 }

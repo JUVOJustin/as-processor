@@ -1,21 +1,47 @@
 <?php
+/**
+ * Trait Sync_Data
+ *
+ * @package juvo/as_processor
+ */
 
 namespace juvo\AS_Processor;
 
 use Exception;
 
+/**
+ * Trait Sync_Data
+ *
+ * This trait provides functionality for managing synchronization data using WordPress transients.
+ * It includes mechanisms for retrieving, setting, and updating synchronization data, while ensuring
+ * proper locking and concurrency handling.
+ * It also supports advanced merging and concatenating options for array-type synchronization data.
+ */
 trait Sync_Data {
 
 
+	/**
+	 * Sync Data Name.
+	 * Each data key is stored in a separate transient with the scheme "$this->sync_data_name_$key".
+	 * This property is to set the shared "$this->sync_data_name" part for all the data keys of a sync.
+	 *
+	 * @var string
+	 */
 	private string $sync_data_name;
+
+	/**
+	 * List of data keys that are locked by the current process.
+	 *
+	 * @var string[]
+	 */
 	private array $locked_by_current_process = array();
 
 	/**
 	 * Returns the sync data from a transient
 	 *
-	 * @param string $key
+	 * @param string $key Key of the sync data to retrieve.
 	 * @return mixed
-	 * @throws \Exception
+	 * @throws Exception Thrown if the data is locked.
 	 */
 	protected function get_sync_data( string $key ): mixed {
 		$attempts = 0;
@@ -24,7 +50,7 @@ trait Sync_Data {
 			try {
 				// Check if the specific key is locked and determine if the current process holds the lock
 				if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
-					throw new \Exception( 'Sync Data is locked' );
+					throw new Exception( esc_attr__( 'Sync Data is locked', 'as-processor' ) );
 				}
 
 				$transient = $this->get_transient( $this->get_sync_data_name() . '_' . $key );
@@ -42,14 +68,16 @@ trait Sync_Data {
 			}
 		} while ( $attempts < 5 );
 
-		$attempts = $attempts + 1; // Adjust counting for final error
-		throw new \Exception( "Sync Data is locked. Tried {$attempts} times" );
+		++$attempts; // Adjust counting for final error
+
+		/* translators: Number of attempts */
+		throw new Exception( sprintf( esc_attr__( 'Sync Data is locked. Tried %d times', 'as-processor' ), intval( $attempts ) ) );
 	}
 
 	/**
 	 * Checks if a lock is currently held.
 	 *
-	 * @param string $key The key of the transient
+	 * @param string $key The key of the transient.
 	 * @return bool True if the lock is held, false otherwise.
 	 */
 	protected function is_locked( string $key ): bool {
@@ -71,6 +99,14 @@ trait Sync_Data {
 		return $this->sync_data_name;
 	}
 
+	/**
+	 * Set the name for synchronization data.
+	 *
+	 * This method assigns a custom name to the synchronization data property. Mostly used for sequential sync process.
+	 *
+	 * @param string $sync_data_name The name to be assigned to the synchronization data.
+	 * @return void
+	 */
 	public function set_sync_data_name( string $sync_data_name ): void {
 		$this->sync_data_name = $sync_data_name;
 	}
@@ -81,15 +117,15 @@ trait Sync_Data {
 	 *
 	 * Only sets the data if locked by itself.
 	 *
-	 * @param string $key
-	 * @param mixed  $data
-	 * @param int    $expiration
+	 * @param string $key The key where the data should be stored.
+	 * @param mixed  $data The data that should be stored.
+	 * @param int    $expiration The TTL of the data before WordPress´s transient handling is free to delete it.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception Thrown if the data is locked.
 	 */
 	protected function set_sync_data( string $key, mixed $data, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 		if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
-			throw new \Exception( 'Sync Data is locked' );
+			throw new Exception( 'Sync Data is locked' );
 		}
 
 		// Store the actual data
@@ -104,16 +140,16 @@ trait Sync_Data {
 	 * and concatenation behaviors and includes a retry mechanism for ensuring successful execution.
 	 *
 	 * @param string $key The key identifying the synchronization data to update.
-	 * @param mixed  $updates The data to update thr synchronization data with.
-	 * @param bool   $deepMerge Optional. Whether to perform a deep merge of arrays. Default is false.
-	 * @param bool   $concatArrays Optional. Whether to concatenate arrays instead of overriding. Default is false.
+	 * @param mixed  $updates The data to update the synchronization data with.
+	 * @param bool   $deep_merge Optional. Whether to perform a deep merge of arrays. Default is false.
+	 * @param bool   $concat_arrays Optional. Whether to concatenate arrays instead of overriding. Default is false.
 	 * @param int    $expiration Optional. The expiration time (in seconds) for the updated data. Default is 6 hours.
 	 *
 	 * @return void
 	 *
-	 * @throws \Exception If the data update fails after multiple attempts.
+	 * @throws Exception If the data update fails after multiple attempts.
 	 */
-	protected function update_sync_data( string $key, mixed $updates, bool $deepMerge = false, bool $concatArrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
+	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
 		$attempts = 0;
 
@@ -123,29 +159,29 @@ trait Sync_Data {
 
 				// Lock data first
 				if ( $this->is_locked( $key ) ) {
-					throw new Exception( 'Lock is already acquired' );
+					throw new Exception( esc_attr__( 'Lock is already acquired', 'as-processor' ) );
 				}
 				$this->set_key_lock( $key, true );
 
 				// Check if values is supposed to be an array
-				if ( $deepMerge || $concatArrays ) {
+				if ( $deep_merge || $concat_arrays ) {
 
 					// Retrieve the current transient data.
-					$currentData = $this->get_sync_data( $key );
+					$current_data = $this->get_sync_data( $key );
 
 					// If current data not initialized yet make it an array
-					if ( ! $currentData ) {
-						$currentData = array();
+					if ( ! $current_data ) {
+						$current_data = array();
 					}
 
 					// At this point if current data is an array and one of the merge options is used we can assume the update should also be an array to be merged
-					if ( is_array( $currentData ) && ! is_array( $updates ) ) {
+					if ( is_array( $current_data ) && ! is_array( $updates ) ) {
 						$updates = array( $updates );
 					}
 
 					// Merge the new updates into the current data, respecting the deepMerge and concatArrays flags.
-					if ( is_array( $currentData ) && is_array( $updates ) ) {
-						$updates = Helper::merge_arrays( $currentData, $updates, $deepMerge, $concatArrays );
+					if ( is_array( $current_data ) && is_array( $updates ) ) {
+						$updates = Helper::merge_arrays( $current_data, $updates, $deep_merge, $concat_arrays );
 					}
 				}
 
@@ -163,7 +199,8 @@ trait Sync_Data {
 		} while ( $attempts < 5 );
 
 		// If this point is reached throw error
-		throw new \Exception( "Failed to update sync data after $attempts tries" );
+		/* translators: Number of attempts */
+		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data after %d tries', 'as-processor' ), intval( $attempts ) ) );
 	}
 
 	/**
@@ -177,9 +214,10 @@ trait Sync_Data {
 	 *
 	 * When an external object cache is used, the get_transient is avoided completely and a forced wp_cache_get is used.
 	 *
+	 * @param string $key Key of the transient to get.
 	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
 	 */
-	private function get_transient( $key ) {
+	private function get_transient( string $key ) {
 
 		if ( ! wp_using_ext_object_cache() ) {
 

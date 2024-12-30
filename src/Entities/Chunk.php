@@ -95,7 +95,7 @@ class Chunk {
 	 * Fetches data from database
 	 *
 	 * @return void
-	 * @throws \DateMalformedStringException Unparsable date.
+	 * @throws Exception Unparsable date.
 	 */
 	private function fetch_data(): void {
 		if ( $this->is_data_fetched ) {
@@ -140,6 +140,7 @@ class Chunk {
 	 * Get the action ID
 	 *
 	 * @return int
+	 * @throws Exception Unparsable Date.
 	 */
 	public function get_action_id(): int {
 		if ( ! $this->is_data_fetched ) {
@@ -152,6 +153,7 @@ class Chunk {
 	 * Get the group
 	 *
 	 * @return string
+	 * @throws Exception Unparsable Date.
 	 */
 	public function get_group(): string {
 		if ( ! $this->is_data_fetched ) {
@@ -164,6 +166,7 @@ class Chunk {
 	 * Get the status
 	 *
 	 * @return ProcessStatus
+	 * @throws Exception Unparsable Date.
 	 */
 	public function get_status(): ProcessStatus {
 		if ( ! $this->is_data_fetched ) {
@@ -176,6 +179,7 @@ class Chunk {
 	 * Get the data
 	 *
 	 * @return array<mixed>
+	 * @throws Exception Unparsable Date.
 	 */
 	public function get_data(): array {
 		if ( ! $this->is_data_fetched ) {
@@ -188,6 +192,7 @@ class Chunk {
 	 * Get the start time
 	 *
 	 * @return DateTimeImmutable
+	 * @throws Exception Unparsable Date.
 	 */
 	public function get_start(): DateTimeImmutable {
 		if ( ! $this->is_data_fetched ) {
@@ -200,6 +205,7 @@ class Chunk {
 	 * Get the end time
 	 *
 	 * @return DateTimeImmutable
+	 * @throws Exception Unparsable Date.
 	 */
 	public function get_end(): DateTimeImmutable {
 		if ( ! $this->is_data_fetched ) {
@@ -221,6 +227,7 @@ class Chunk {
 	 * Get the duration in seconds
 	 *
 	 * @return float Returns the duration in seconds with microsecond precision
+	 * @throws Exception Unparsable Date.
 	 */
 	public function get_duration(): float {
 		if ( ! $this->is_data_fetched ) {
@@ -287,7 +294,7 @@ class Chunk {
 	 *
 	 * @param float $microtime Start time of chunk processing as microtime.
 	 * @return void
-	 * @throws \DateMalformedStringException Unparsable date.
+	 * @throws Exception Unparsable Date.
 	 */
 	public function set_start( float $microtime ): void {
 		$this->start = Helper::convert_microtime_to_datetime( $microtime );
@@ -298,7 +305,7 @@ class Chunk {
 	 *
 	 * @param float $microtime End time of chunk processing as microtime.
 	 * @return void
-	 * @throws \DateMalformedStringException Unparsable date.
+	 * @throws Exception Unparsable Date.
 	 */
 	public function set_end( float $microtime ): void {
 		$this->end = Helper::convert_microtime_to_datetime( $microtime );

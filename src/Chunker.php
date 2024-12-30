@@ -90,7 +90,7 @@ trait Chunker {
 	/**
 	 * Handles the actual data processing. Should be implemented in the class lowest in hierarchy.
 	 *
-	 * @param Generator<mixed> $chunk_data The generator containing chunk data to process.
+	 * @param Generator $chunk_data The generator containing chunk data to process.
 	 * @return void
 	 */
 	abstract protected function process_chunk_data( Generator $chunk_data ): void;

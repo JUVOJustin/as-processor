@@ -1,4 +1,10 @@
 <?php
+/**
+ * Provides an abstract base class for synchronization processes that interact with Action Scheduler.
+ * This class establishes hooks and manages the synchronization lifecycle using Action Scheduler.
+ *
+ * @package juvo/as-processor
+ */
 
 namespace juvo\AS_Processor;
 
@@ -9,14 +15,32 @@ use Exception;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
 
+/**
+ * Abstract base class for managing synchronization processes utilizing Action Scheduler.
+ * This class initializes hooks, processes actions in chunks, handles errors, and manages
+ * group naming and lifecycle for synchronization tasks. It provides structure and methods
+ * for scheduling, tracking, and completing chunks within a synchronization process.
+ */
 abstract class Sync implements Syncable {
 
 
 	use Sync_Data;
 	use Chunker;
 
+	/**
+	 * Name of the group the sync belongs to
+	 *
+	 * @var string
+	 */
 	private string $sync_group_name;
 
+	/**
+	 * Initializes the class instance.
+	 *
+	 * Calls the necessary hooks and sets up the environment required for the instance.
+	 *
+	 * @return void
+	 */
 	public function __construct() {
 		$this->set_hooks();
 	}
@@ -27,7 +51,7 @@ abstract class Sync implements Syncable {
 	 * @return void
 	 */
 	public function set_hooks(): void {
-		add_action( 'action_scheduler_begin_execute', array( $this, 'track_action_start' ), 10, 2 );
+		add_action( 'action_scheduler_begin_execute', array( $this, 'track_action_start' ), 10, 1 );
 		add_action( 'action_scheduler_completed_action', array( $this, 'maybe_trigger_last_in_group' ) );
 		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
 
@@ -59,15 +83,15 @@ abstract class Sync implements Syncable {
 	 *
 	 * @return string
 	 */
-	abstract function get_sync_name(): string;
+	abstract public function get_sync_name(): string;
 
 	/**
 	 * Callback for the Chunk jobs. The child implementation either dispatches to an import or an export
 	 *
-	 * @param int $chunk_id
+	 * @param int $chunk_id Database ID of the chunk that should be processed.
 	 * @return void
 	 */
-	abstract function process_chunk( int $chunk_id ): void;
+	abstract protected function process_chunk( int $chunk_id ): void;
 
 	/**
 	 * Returns the sync group name. If none set it will generate one from the sync name and the current time
@@ -118,9 +142,9 @@ abstract class Sync implements Syncable {
 	 * Checks if there are more remaining jobs in the queue or if this is the last one.
 	 * This can be used to add additional cleanup jobs
 	 *
-	 * @param int $action_id
+	 * @param int $action_id ID of the action to check.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception DB Error.
 	 */
 	public function maybe_trigger_last_in_group( int $action_id ): void {
 
@@ -129,9 +153,9 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
-		// avoid recoursion by not hooking a complete action while
+		// avoid recursion by not hooking a complete action while
 		// in complete context
-		if ( $action->get_hook() == $this->get_sync_name() . '/complete' ) {
+		if ( $action->get_hook() === $this->get_sync_name() . '/complete' ) {
 			return;
 		}
 
@@ -161,12 +185,11 @@ abstract class Sync implements Syncable {
 	 * Callback for "action_scheduler_before_execute" hook. It gets the current action and (re)sets the group name.
 	 * This is needed to have a consistent group name through all executions of a group
 	 *
-	 * @param int   $action_id
-	 * @param mixed $context
+	 * @param int $action_id ID of the action to track.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception DB Error.
 	 */
-	public function track_action_start( int $action_id, mixed $context ): void {
+	public function track_action_start( int $action_id ): void {
 		$action = $this->action_belongs_to_sync( $action_id );
 		if ( ! $action || empty( $action->get_group() ) ) {
 			return;
@@ -188,7 +211,7 @@ abstract class Sync implements Syncable {
 	/**
 	 * Checks if the passed action belongs to the sync. If so returns the action object else false.
 	 *
-	 * @param int $action_id
+	 * @param int $action_id ID of the action to check.
 	 * @return false|ActionScheduler_Action
 	 */
 	private function action_belongs_to_sync( int $action_id ): false|ActionScheduler_Action {
@@ -206,10 +229,10 @@ abstract class Sync implements Syncable {
 	 * Wraps the execution of the on_fail method, if it exists, for error handling.
 	 * Checks if the errored action belongs to the sync. If so passes the action instead of the action_id to be more flexible
 	 *
-	 * @param int       $action_id The ID of the action
-	 * @param Exception $e The exception that was thrown
+	 * @param int       $action_id The ID of the action.
+	 * @param Exception $e The exception that was thrown.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception DB Error.
 	 */
 	public function handle_exception( int $action_id, Exception $e ): void {
 
@@ -238,7 +261,7 @@ abstract class Sync implements Syncable {
 	 *
 	 * @param int $action_id The ID of the action that timed out.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception DB Error.
 	 */
 	public function handle_timeout( int $action_id ): void {
 
@@ -263,12 +286,12 @@ abstract class Sync implements Syncable {
 	/**
 	 * Handles the cancellation of an action.
 	 *
-	 * Marks the chunk associated with the action as cancelled, records the end time,
+	 * Marks the chunk associated with the action as canceled, records the end time,
 	 * and triggers a custom action for cancellation.
 	 *
-	 * @param int $action_id The ID of the action to be cancelled.
+	 * @param int $action_id The ID of the action to be canceled.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception DB Error.
 	 */
 	public function handle_cancel( int $action_id ): void {
 
