@@ -4,101 +4,97 @@ namespace juvo\AS_Processor;
 
 use Exception;
 
-trait Sync_Data
-{
+trait Sync_Data {
 
-    private string $sync_data_name;
-    private array $locked_by_current_process = [];
 
-    /**
-     * Returns the sync data from a transient
-     *
-     * @param string $key
-     * @return mixed
-     * @throws \Exception
-     */
-    protected function get_sync_data(string $key): mixed {
-        $attempts = 0;
+	private string $sync_data_name;
+	private array $locked_by_current_process = array();
 
-        do {
-            try {
-                // Check if the specific key is locked and determine if the current process holds the lock
-                if ($this->is_locked($key) && !$this->is_key_locked_by_current_process($key)) {
-                    throw new \Exception('Sync Data is locked');
-                }
+	/**
+	 * Returns the sync data from a transient
+	 *
+	 * @param string $key
+	 * @return mixed
+	 * @throws \Exception
+	 */
+	protected function get_sync_data( string $key ): mixed {
+		$attempts = 0;
 
-                $transient = $this->get_transient($this->get_sync_data_name() . '_' . $key);
+		do {
+			try {
+				// Check if the specific key is locked and determine if the current process holds the lock
+				if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
+					throw new \Exception( 'Sync Data is locked' );
+				}
 
-                // Return false if there's no data
-                if (empty($transient)) {
-                    return false;
-                }
+				$transient = $this->get_transient( $this->get_sync_data_name() . '_' . $key );
 
-                return $transient;
-            } catch (Exception) {
-                $attempts++;
-                sleep(1);
-                continue;
-            }
-        } while ($attempts < 5);
+				// Return false if there's no data
+				if ( empty( $transient ) ) {
+					return false;
+				}
 
-        $attempts = $attempts + 1; // Adjust counting for final error
-        throw new \Exception("Sync Data is locked. Tried {$attempts} times");
-    }
+				return $transient;
+			} catch ( Exception ) {
+				++$attempts;
+				sleep( 1 );
+				continue;
+			}
+		} while ( $attempts < 5 );
 
-    /**
-     * Checks if a lock is currently held.
-     *
-     * @param string $key The key of the transient
-     * @return bool True if the lock is held, false otherwise.
-     */
-    protected function is_locked(string $key): bool
-    {
-        return (bool) $this->get_transient($this->get_sync_data_name() . '_' . $key . '_lock');
-    }
+		$attempts = $attempts + 1; // Adjust counting for final error
+		throw new \Exception( "Sync Data is locked. Tried {$attempts} times" );
+	}
 
-    /**
-     * Returns the currently set sync data name. Defaults to the sync group name.
-     * Since the name can be overwritten with the setter and the group name is retrieved from the "action_scheduler_before_execute"
-     *
-     * @return string
-     */
-    public function get_sync_data_name(): string
-    {
-        // Set sync data key to the group name by default. Sequential Sync does not have a group name
-        if (empty($this->sync_data_name)  && method_exists($this, 'get_sync_group_name')) {
-            $this->sync_data_name = $this->get_sync_group_name();
-            return $this->sync_data_name;
-        }
-        return $this->sync_data_name;
-    }
+	/**
+	 * Checks if a lock is currently held.
+	 *
+	 * @param string $key The key of the transient
+	 * @return bool True if the lock is held, false otherwise.
+	 */
+	protected function is_locked( string $key ): bool {
+		return (bool) $this->get_transient( $this->get_sync_data_name() . '_' . $key . '_lock' );
+	}
 
-    public function set_sync_data_name(string $sync_data_name): void
-    {
-        $this->sync_data_name = $sync_data_name;
-    }
+	/**
+	 * Returns the currently set sync data name. Defaults to the sync group name.
+	 * Since the name can be overwritten with the setter and the group name is retrieved from the "action_scheduler_before_execute"
+	 *
+	 * @return string
+	 */
+	public function get_sync_data_name(): string {
+		// Set sync data key to the group name by default. Sequential Sync does not have a group name
+		if ( empty( $this->sync_data_name ) && method_exists( $this, 'get_sync_group_name' ) ) {
+			$this->sync_data_name = $this->get_sync_group_name();
+			return $this->sync_data_name;
+		}
+		return $this->sync_data_name;
+	}
 
-    /**
-     * Stores data in a transient to be access in other jobs.
-     * This can be used e.g. to build a delta of post ids.
+	public function set_sync_data_name( string $sync_data_name ): void {
+		$this->sync_data_name = $sync_data_name;
+	}
+
+	/**
+	 * Stores data in a transient to be access in other jobs.
+	 * This can be used e.g. to build a delta of post ids.
 	 *
 	 * Only sets the data if locked by itself.
-     *
-     * @param string $key
-     * @param mixed $data
-     * @param int $expiration
-     * @return void
-     * @throws Exception
-     */
-    protected function set_sync_data(string $key, mixed $data, int $expiration = HOUR_IN_SECONDS * 6): void
-    {
-        if ($this->is_locked($key) && !$this->is_key_locked_by_current_process($key)) {
-            throw new \Exception('Sync Data is locked');
-        }
+	 *
+	 * @param string $key
+	 * @param mixed  $data
+	 * @param int    $expiration
+	 * @return void
+	 * @throws Exception
+	 */
+	protected function set_sync_data( string $key, mixed $data, int $expiration = HOUR_IN_SECONDS * 6 ): void {
+		if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
+			throw new \Exception( 'Sync Data is locked' );
+		}
 
-        // Store the actual data
-        set_transient($this->get_sync_data_name() . '_' . $key, $data, $expiration);
-    }
+		// Store the actual data
+		set_transient( $this->get_sync_data_name() . '_' . $key, $data, $expiration );
+	}
 
 	/**
 	 * Updates synchronization data with new values, applying optional merge strategies.
@@ -108,128 +104,127 @@ trait Sync_Data
 	 * and concatenation behaviors and includes a retry mechanism for ensuring successful execution.
 	 *
 	 * @param string $key The key identifying the synchronization data to update.
-	 * @param mixed $updates The data to update thr synchronization data with.
-	 * @param bool $deepMerge Optional. Whether to perform a deep merge of arrays. Default is false.
-	 * @param bool $concatArrays Optional. Whether to concatenate arrays instead of overriding. Default is false.
-	 * @param int $expiration Optional. The expiration time (in seconds) for the updated data. Default is 6 hours.
+	 * @param mixed  $updates The data to update thr synchronization data with.
+	 * @param bool   $deepMerge Optional. Whether to perform a deep merge of arrays. Default is false.
+	 * @param bool   $concatArrays Optional. Whether to concatenate arrays instead of overriding. Default is false.
+	 * @param int    $expiration Optional. The expiration time (in seconds) for the updated data. Default is 6 hours.
 	 *
 	 * @return void
 	 *
 	 * @throws \Exception If the data update fails after multiple attempts.
 	 */
-    protected function update_sync_data(string $key, mixed $updates,bool $deepMerge = false, bool $concatArrays = false, int $expiration = HOUR_IN_SECONDS * 6): void
-    {
+	protected function update_sync_data( string $key, mixed $updates, bool $deepMerge = false, bool $concatArrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
-        $attempts = 0;
+		$attempts = 0;
 
-        // Update sync data
-        do {
-            try {
+		// Update sync data
+		do {
+			try {
 
-                // Lock data first
-				if ($this->is_locked($key)) {
-					throw new Exception('Lock is already acquired');
+				// Lock data first
+				if ( $this->is_locked( $key ) ) {
+					throw new Exception( 'Lock is already acquired' );
 				}
-				$this->set_key_lock($key, true);
+				$this->set_key_lock( $key, true );
 
 				// Check if values is supposed to be an array
-				if ($deepMerge || $concatArrays) {
+				if ( $deepMerge || $concatArrays ) {
 
 					// Retrieve the current transient data.
 					$currentData = $this->get_sync_data( $key );
 
 					// If current data not initialized yet make it an array
-					if (!$currentData) {
-						$currentData = [];
+					if ( ! $currentData ) {
+						$currentData = array();
 					}
 
 					// At this point if current data is an array and one of the merge options is used we can assume the update should also be an array to be merged
-					if (is_array($currentData) && !is_array($updates)) {
-						$updates = [$updates];
+					if ( is_array( $currentData ) && ! is_array( $updates ) ) {
+						$updates = array( $updates );
 					}
 
 					// Merge the new updates into the current data, respecting the deepMerge and concatArrays flags.
-					if (is_array($currentData) && is_array($updates)) {
-						$updates = Helper::merge_arrays($currentData, $updates, $deepMerge, $concatArrays);
+					if ( is_array( $currentData ) && is_array( $updates ) ) {
+						$updates = Helper::merge_arrays( $currentData, $updates, $deepMerge, $concatArrays );
 					}
 				}
 
-                // Save the updated data back into the transient.
-                $this->set_sync_data($key, $updates, $expiration);
+				// Save the updated data back into the transient.
+				$this->set_sync_data( $key, $updates, $expiration );
 
-                // Unlock
-				$this->set_key_lock($key, false);
-                return;
-            } catch (Exception $e) {
-                $attempts++;
-                sleep(1);
-                continue;
-            }
-        } while($attempts < 5);
+				// Unlock
+				$this->set_key_lock( $key, false );
+				return;
+			} catch ( Exception $e ) {
+				++$attempts;
+				sleep( 1 );
+				continue;
+			}
+		} while ( $attempts < 5 );
 
-        // If this point is reached throw error
-        throw new \Exception("Failed to update sync data after $attempts tries");
-    }
+		// If this point is reached throw error
+		throw new \Exception( "Failed to update sync data after $attempts tries" );
+	}
 
-    /**
-     * Get the most recent transient value
-     *
-     * Due to the nature of transients and how wordpress handels object caching, this wrapper is needed to always get
-     * the most recent value from the cache.
-     *
-     * WordPress caches transients in the options group if no external object cache is used.
-     * These caches are also deleted before querying the new db value.
-     *
-     * When an external object cache is used, the get_transient is avoided completely and a forced wp_cache_get is used.
-     *
-     * @link https://github.com/rhubarbgroup/redis-cache/issues/523
-     */
-    private function get_transient($key)
-	{
+	/**
+	 * Get the most recent transient value
+	 *
+	 * Due to the nature of transients and how WordPress handels object caching, this wrapper is needed to always get
+	 * the most recent value from the cache.
+	 *
+	 * WordPress caches transients in the options group if no external object cache is used.
+	 * These caches are also deleted before querying the new db value.
+	 *
+	 * When an external object cache is used, the get_transient is avoided completely and a forced wp_cache_get is used.
+	 *
+	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
+	 */
+	private function get_transient( $key ) {
 
-		if (!wp_using_ext_object_cache()) {
+		if ( ! wp_using_ext_object_cache() ) {
 
 			// Delete transient cache
 			$deletion_key = '_transient_' . $key;
-			wp_cache_delete($deletion_key, 'options');
+			wp_cache_delete( $deletion_key, 'options' );
 
 			// Delete timeout cache
 			$deletion_key = '_transient_timeout_' . $key;
-			wp_cache_delete($deletion_key, 'options');
+			wp_cache_delete( $deletion_key, 'options' );
 
 			// At this point object cache is cleared and can be requested again
-			$data = get_transient($key);
+			$data = get_transient( $key );
 		} else {
-			$data = wp_cache_get($key, "transient", true);
+			$data = wp_cache_get( $key, 'transient', true );
 		}
 
-        return $data;
-    }
+		return $data;
+	}
 
-    /**
-     * Fully deletes the sync data
-     *
-     * @return void
-     */
-    public function delete_sync_data(): void
-    {
-        global $wpdb;
+	/**
+	 * Fully deletes the sync data
+	 *
+	 * @return void
+	 */
+	public function delete_sync_data(): void {
+		global $wpdb;
 
-        // Define the base name of your transient
-        $base_transient_name = $this->get_sync_data_name() . '_';
+		// Define the base name of your transient
+		$base_transient_name = $this->get_sync_data_name() . '_';
 
-        // Prepare the like pattern for SQL, escaping wildcards and adding the wildcard placeholder
-        $like_pattern = $wpdb->esc_like('_transient_' . $base_transient_name) . '%';
+		// Prepare the like pattern for SQL, escaping wildcards and adding the wildcard placeholder
+		$like_pattern = $wpdb->esc_like( '_transient_' . $base_transient_name ) . '%';
 
-        // Use $wpdb to directly delete transients from the wp_options table
-        $wpdb->query(
-            $wpdb->prepare("
+		// Use $wpdb to directly delete transients from the wp_options table
+		$wpdb->query(
+			$wpdb->prepare(
+				"
                 DELETE FROM $wpdb->options
                 WHERE option_name LIKE %s
-                ", $like_pattern
-            )
-        );
-    }
+                ",
+				$like_pattern
+			)
+		);
+	}
 
 	/**
 	 * Determines if the given key is currently locked by the current process.
@@ -240,10 +235,9 @@ trait Sync_Data
 	 * @param string $key The unique identifier for the lock.
 	 * @return bool True if the key is locked by the current process, otherwise false.
 	 */
-	protected function is_key_locked_by_current_process(string $key): bool
-    {
-        return isset($this->locked_by_current_process[$key]) && $this->locked_by_current_process[$key];
-    }
+	protected function is_key_locked_by_current_process( string $key ): bool {
+		return isset( $this->locked_by_current_process[ $key ] ) && $this->locked_by_current_process[ $key ];
+	}
 
 	/**
 	 * Set a lock state for a specific key with an optional time-to-live (TTL).
@@ -252,20 +246,19 @@ trait Sync_Data
 	 * The lock helps in synchronizing processes to prevent conflicts.
 	 *
 	 * @param string $key The key for which the lock state is being set.
-	 * @param bool $state Determines whether to enable (true) or disable (false) the key lock.
+	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
 	 * @return void
 	 */
-	protected function set_key_lock(string $key, bool $state): void
-	{
-		$this->locked_by_current_process[$key] = $state;
+	protected function set_key_lock( string $key, bool $state ): void {
+		$this->locked_by_current_process[ $key ] = $state;
 
-		if ($state) {
+		if ( $state ) {
 			// Allow the lock TTL to be filtered using a specific hook.
-			$lock_ttl = apply_filters('asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key);
+			$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key );
 
-			set_transient($this->get_sync_data_name() . '_' . $key . '_lock', true, $lock_ttl);
+			set_transient( $this->get_sync_data_name() . '_' . $key . '_lock', true, $lock_ttl );
 		} else {
-			delete_transient($this->get_sync_data_name() . '_' . $key . '_lock');
+			delete_transient( $this->get_sync_data_name() . '_' . $key . '_lock' );
 		}
 	}
 }
