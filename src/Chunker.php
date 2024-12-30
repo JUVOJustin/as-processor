@@ -102,7 +102,7 @@ trait Chunker {
 	 * @return void
 	 */
 	public function schedule_chunk_cleanup(): void {
-		if ( as_has_scheduled_action( 'ASP/Chunks/Cleanup' ) ) {
+		if ( as_has_scheduled_action( 'asp/chunks/cleanup' ) ) {
 			return;
 		}
 
@@ -110,7 +110,7 @@ trait Chunker {
 		as_schedule_cron_action(
 			time(),
 			'0 0 * * *',
-			'ASP/Chunks/Cleanup'
+			'asp/chunks/cleanup'
 		);
 	}
 
