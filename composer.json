@@ -10,7 +10,8 @@
         "sabre/dav": "^4.6",
         "cardinalby/content-disposition": "^1.1",
         "league/csv": "^9.0",
-        "phpoffice/phpspreadsheet": "^2.1"
+        "phpoffice/phpspreadsheet": "^2.1",
+        "halaxa/json-machine": "^1.2"
     },
     "support"     : {
         "issues" : "https://github.com/JUVOJustin/wp-secure-actions/issues"

@@ -7,8 +7,8 @@
 namespace juvo\AS_Processor\Imports;
 
 use Exception;
-use WP_Error;
-use WP_Filesystem_Direct;
+use JsonMachine\Items;
+use juvo\AS_Processor\Helper;
 use juvo\AS_Processor\Import;
 
 /**
@@ -22,28 +22,15 @@ abstract class JSON extends Import
      *
      * @var int
      */
-    public int $chunk_size = 10;
+    public int $chunkSize = 10;
 
-    /**
-     * The maximum depth allowed for parsing
-     *
-     * @var int
-     */
-    public int $depth = 512;
-
-    /**
-     * Bitmask consisting of JSON constants, which forces a JSON function to throw a JsonException if an error occurs
-     *
-     * @var int
-     */
-    public int $flags = JSON_THROW_ON_ERROR;
-
-    /**
-     * Indicates if the array is associative
-     *
-     * @var bool
-     */
-    public bool $associative = TRUE;
+	/**
+	 * You can add a JSON Pointer to only get certain data
+	 *
+	 * @var string|null
+	 * @link https://github.com/halaxa/json-machine?tab=readme-ov-file#json-pointer
+	 */
+	public ?string $pointer = "";
 
     /**
      * Retrieves the source path as a string.
@@ -60,8 +47,9 @@ abstract class JSON extends Import
     public function split_data_into_chunks(): void
     {
         $filepath = $this->get_source_path();
+		$wp_filesystem = Helper::get_direct_filesystem();
 
-        if (! is_file($filepath)) {
+        if (! $wp_filesystem->is_file($filepath)) {
             throw new Exception(
                 sprintf(
                     '%s - %s',
@@ -71,58 +59,28 @@ abstract class JSON extends Import
             );
         }
 
-        $data = $this->fetch_data_from_source_file( $filepath );
+		$chunkData = [];
+		$items = Items::fromFile($filepath, ['pointer' => $this->pointer]);
+		foreach ($items as $item) {
 
-        if (empty($data)) {
-            return;
-        }
+			$chunkData[] = $item;
 
-        $chunks = array_chunk($data, $this->chunk_size);
+			// schedule chunk and empty chunk data
+			if ( count($chunkData) >= $this->chunkSize ) {
+				$this->schedule_chunk($chunkData);
+				$chunkData = [];
+			}
+		}
 
-        foreach ($chunks as $chunk) {
-            $this->schedule_chunk($chunk);
-        }
-    }
+		// Add remaining elements into a last chunk
+		if ( ! empty( $chunkData ) ) {
+			$this->schedule_chunk($chunkData);
+		}
 
-    /**
-     * Processes the fetching of data from a specified file path.
-     *
-     * @param string $filepath the path to the json file
-     * @return array<mixed> The decoded JSON data or an empty array on error
-     * @throws Exception When JSON decoding fails
-     */
-    public function fetch_data_from_source_file( string $filepath ): array
-    {
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        $wp_filesystem = new WP_Filesystem_Direct(null);
-        $data = $wp_filesystem->get_contents($filepath);
-
-        if (false === $data) {
-            throw new Exception(
-                sprintf(
-                    '%s - %s',
-                    $this->get_sync_name(),
-                    __('Could not read file contents.', 'asp')
-                )
-            );
-        }
-
-        try {
-            $decoded_data = json_decode($data, $this->associative, $this->depth, $this->flags);
-        } catch (Exception $e) {
-            throw new Exception(
-                sprintf(
-                    '%s - %s',
-                    $this->get_sync_name(),
-                    $e->getMessage()
-                )
-            );
-        }
-
-        if ($decoded_data instanceof WP_Error || empty($decoded_data)) {
-            return [];
-        }
-
-        return $decoded_data;
+		// Delete
+		$unlink_result = $wp_filesystem->delete($filepath);
+		if ( $unlink_result === false ) {
+			throw new Exception("File '$filepath' could not be deleted!");
+		}
     }
 }
