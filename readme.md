@@ -1,4 +1,4 @@
-The **AS Processor** library is a robust synchronization and data chunking framework designed specifically for WordPress environments. Leveraging the power of asynchronous task management through the Action Scheduler, it provides a flexible and efficient orchestration for large-scale data processing tasks, such as API synchronizations, file-based (CSV, Excel, JSON) imports, and seamless chunk-wise data management.
+The **AS Processor** library is a robust synchronization and data chunking framework designed specifically for WordPress environments. Leveraging asynchronous task management through the Action Scheduler, it provides a flexible and efficient orchestration for large-scale data processing tasks, such as API synchronizations, file-based (CSV, Excel, JSON) imports, and seamless chunk-wise data management.
 
 ### Core Features
 1. **Data Chunking and Processing**:
@@ -54,5 +54,6 @@ This library is an excellent choice for WordPress developers and enterprises dea
 - High-volume data integration from various sources.
 - Automating repetitive and resource-intensive synchronization tasks.
 - Optimizing workflows for applications that rely on large datasets or slow APIs.
+- Frequent e-commerce product imports
 
 AS Processor combines the power of modern WordPress development practices, Action Scheduler's asynchronous processing capabilities, and a highly abstracted framework to enable seamless and fault-tolerant data processing at scale. It offers developers a solid foundation for building efficient, scalable synchronization solutions tailored to their applications' unique requirements.
