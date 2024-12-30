@@ -1,9 +1,21 @@
 <?php
+/**
+ * A utility class that provides various helper methods for filesystem handling,
+ *  time manipulations, and array operations.
+ *
+ * @package juvo\AS_Processor
+ */
 
 namespace juvo\AS_Processor;
 
 use DateTimeImmutable;
 
+/**
+ * Class Helper
+ *
+ * A utility class that provides various helper methods for filesystem handling,
+ * time manipulations, and array operations.
+ */
 class Helper {
 
 
@@ -44,11 +56,14 @@ class Helper {
 	}
 
 	/**
-	 * Converts a microtime float to a DateTimeImmutable
+	 * Converts a microtime value to a DateTimeImmutable object.
 	 *
-	 * @param float|null $microtime The microtime from microtime(true)
-	 * @return DateTimeImmutable|null
-	 * @throws \DateMalformedStringException
+	 * This method takes a floating-point microtime value and converts it to a
+	 * DateTimeImmutable object. If the input is null, it returns null.
+	 *
+	 * @param float|null $microtime The microtime value to convert, or null.
+	 * @return DateTimeImmutable|null Returns a DateTimeImmutable object representing the given microtime value, or null if input is null.
+	 * @throws \DateMalformedStringException Unparsable date format.
 	 */
 	public static function convert_microtime_to_datetime( ?float $microtime ): ?DateTimeImmutable {
 		if ( null === $microtime ) {
@@ -167,11 +182,11 @@ class Helper {
 	 *
 	 * @param array $array1 The original array.
 	 * @param array $array2 The array to merge into the original array.
-	 * @param bool  $deepMerge Optional. Flag to control deep merging. Default is false.
-	 * @param bool  $concatArrays Optional. Flag to control array concatenation. Default is false.
+	 * @param bool  $deep_merge Optional. Flag to control deep merging. Default is false.
+	 * @param bool  $concat_arrays Optional. Flag to control array concatenation. Default is false.
 	 * @return array The merged array.
 	 */
-	public static function merge_arrays( array $array1, array $array2, bool $deepMerge = false, bool $concatArrays = false ): array {
+	public static function merge_arrays( array $array1, array $array2, bool $deep_merge = false, bool $concat_arrays = false ): array {
 		// Check if both arrays are flat
 		if ( self::is_flat_array( $array1 ) && self::is_flat_array( $array2 ) ) {
 			return array_merge( $array1, $array2 );
@@ -182,7 +197,7 @@ class Helper {
 					$array1[ $key ] = $value;
 				} elseif ( is_array( $value ) && is_array( $array1[ $key ] ) ) {
 					// Both values are arrays, merge them based on the merge strategy
-					$array1[ $key ] = self::merge_array_values( $array1[ $key ], $value, $deepMerge, $concatArrays );
+					$array1[ $key ] = self::merge_array_values( $array1[ $key ], $value, $deep_merge, $concat_arrays );
 				} else {
 					// If types don't match (one is array, the other is not), use the value from array2
 					$array1[ $key ] = $value;
@@ -198,22 +213,22 @@ class Helper {
 	 *
 	 * @param array $value1 The original array value.
 	 * @param array $value2 The array value to merge into the original.
-	 * @param bool  $deepMerge Flag to control deep merging.
-	 * @param bool  $concatArrays Flag to control array concatenation.
+	 * @param bool  $deep_merge Flag to control deep merging.
+	 * @param bool  $concat_arrays Flag to control array concatenation.
 	 * @return array The merged array value.
 	 */
-	public static function merge_array_values( array $value1, array $value2, bool $deepMerge, bool $concatArrays ): array {
-		$bothIndexed = self::is_indexed_array( $value1 ) && self::is_indexed_array( $value2 );
+	public static function merge_array_values( array $value1, array $value2, bool $deep_merge, bool $concat_arrays ): array {
+		$both_indexed = self::is_indexed_array( $value1 ) && self::is_indexed_array( $value2 );
 
-		if ( ! $deepMerge ) {
-			return self::shallow_merge( $value1, $value2, $bothIndexed, $concatArrays );
+		if ( ! $deep_merge ) {
+			return self::shallow_merge( $value1, $value2, $both_indexed, $concat_arrays );
 		}
 
-		if ( $bothIndexed ) {
-			return $concatArrays ? array_merge( $value1, $value2 ) : $value2;
+		if ( $both_indexed ) {
+			return $concat_arrays ? array_merge( $value1, $value2 ) : $value2;
 		}
 
-		return self::merge_arrays( $value1, $value2, true, $concatArrays );
+		return self::merge_arrays( $value1, $value2, true, $concat_arrays );
 	}
 
 	/**
@@ -221,13 +236,13 @@ class Helper {
 	 *
 	 * @param array $value1 The original array value.
 	 * @param array $value2 The array value to merge into the original.
-	 * @param bool  $bothIndexed Whether both arrays are indexed.
-	 * @param bool  $concatArrays Flag to control array concatenation.
+	 * @param bool  $both_indexed Whether both arrays are indexed.
+	 * @param bool  $concat_arrays Flag to control array concatenation.
 	 * @return array The shallow-merged array.
 	 */
-	public static function shallow_merge( array $value1, array $value2, bool $bothIndexed, bool $concatArrays ): array {
-		if ( $bothIndexed ) {
-			return $concatArrays ? array_merge( $value1, $value2 ) : $value2;
+	public static function shallow_merge( array $value1, array $value2, bool $both_indexed, bool $concat_arrays ): array {
+		if ( $both_indexed ) {
+			return $concat_arrays ? array_merge( $value1, $value2 ) : $value2;
 		}
 
 		// For associative arrays, merge at the top level
@@ -237,14 +252,14 @@ class Helper {
 	/**
 	 * Checks if an array is an indexed array (not associative).
 	 *
-	 * @param array $array The array to check.
+	 * @param array $data The array to check.
 	 * @return bool True if the array is indexed, false otherwise.
 	 */
-	public static function is_indexed_array( array $array ): bool {
-		if ( empty( $array ) ) {
+	public static function is_indexed_array( array $data ): bool {
+		if ( empty( $data ) ) {
 			return true; // Consider empty arrays as indexed
 		}
-		return array_keys( $array ) === range( 0, count( $array ) - 1 );
+		return array_keys( $data ) === range( 0, count( $data ) - 1 );
 	}
 
 	/**
@@ -252,11 +267,11 @@ class Helper {
 	 *
 	 * An array is considered flat if none of its elements are arrays.
 	 *
-	 * @param array<mixed> $array The array to be checked.
+	 * @param array<mixed> $data The array to be checked.
 	 * @return bool Returns true if the array is flat, false otherwise.
 	 */
-	public static function is_flat_array( array $array ): bool {
-		foreach ( $array as $value ) {
+	public static function is_flat_array( array $data ): bool {
+		foreach ( $data as $value ) {
 			if ( is_array( $value ) ) {
 				return false;
 			}

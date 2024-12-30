@@ -4,11 +4,11 @@
  *
  * @package juvo\AS_Processor
  */
+
 namespace juvo\AS_Processor\Entities;
 
 use Exception;
 use DateTimeImmutable;
-use DateInterval;
 use juvo\AS_Processor\Helper;
 use juvo\AS_Processor\DB;
 
@@ -20,51 +20,64 @@ class Chunk {
 	use DB;
 
 	/**
+	 * ID of the chunk.
+	 *
 	 * @var int|null
 	 */
 	private ?int $chunk_id = null;
 
 	/**
+	 * If of the "action scheduler" action that processes this chunk.
+	 *
 	 * @var int|null
 	 */
 	private ?int $action_id = null;
 
 	/**
-	 * @var string|null
-	 */
-	private ?string $name = null;
-
-	/**
+	 * Name of the group the chunk and the action belong to.
+	 *
 	 * @var string|null
 	 */
 	private ?string $group = null;
 
 	/**
+	 * Status of the chunk.
+	 *
 	 * @var ProcessStatus|null
 	 */
 	private ?ProcessStatus $status = null;
 
 	/**
+	 * Chunk data. This is the data that is being processed.
+	 *
 	 * @var array<mixed>|null
 	 */
 	private ?array $data = null;
 
 	/**
+	 * Time when the chunk processing has been started.
+	 *
 	 * @var DateTimeImmutable|null
 	 */
 	private ?DateTimeImmutable $start = null;
 
 	/**
+	 * Time when the chunk processing has ended.
+	 *
 	 * @var DateTimeImmutable|null
 	 */
 	private ?DateTimeImmutable $end = null;
 
 	/**
+	 * Flag to check if the data has been fetched from the DB.
+	 *
 	 * @var bool
 	 */
 	private bool $is_data_fetched = false;
 
 	/**
+	 * Log of the action fetched from "action scheduler" DB table
+	 *
 	 * @var array<object>
 	 */
 	private array $logs = array();
@@ -82,6 +95,7 @@ class Chunk {
 	 * Fetches data from database
 	 *
 	 * @return void
+	 * @throws \DateMalformedStringException Unparsable date.
 	 */
 	private function fetch_data(): void {
 		if ( $this->is_data_fetched ) {
@@ -96,7 +110,6 @@ class Chunk {
 
 		if ( $data ) {
 			$this->action_id = (int) $data->action_id;
-			$this->name      = $data->name;
 			$this->group     = $data->group;
 			$this->status    = ProcessStatus::from( $data->status );
 			$this->data      = unserialize( $data->data );
@@ -133,18 +146,6 @@ class Chunk {
 			$this->fetch_data();
 		}
 		return $this->action_id;
-	}
-
-	/**
-	 * Get the name
-	 *
-	 * @return string
-	 */
-	public function get_name(): string {
-		if ( ! $this->is_data_fetched ) {
-			$this->fetch_data();
-		}
-		return $this->name;
 	}
 
 	/**
@@ -230,10 +231,7 @@ class Chunk {
 			return 0.0;
 		}
 
-		/** @var DateTimeImmutable $end */
-		$end = $this->end;
-
-		/** @var DateTimeImmutable $start */
+		$end   = $this->end;
 		$start = $this->start;
 
 		// Get timestamps with microseconds
@@ -245,9 +243,9 @@ class Chunk {
 	}
 
 	/**
-	 * Sets the action ID
+	 * Sets the action ID.
 	 *
-	 * @param int $action_id The action ID
+	 * @param int $action_id The action ID.
 	 * @return void
 	 */
 	public function set_action_id( int $action_id ): void {
@@ -255,19 +253,9 @@ class Chunk {
 	}
 
 	/**
-	 * Sets the name
+	 * Sets the group.
 	 *
-	 * @param string $name The name
-	 * @return void
-	 */
-	public function set_name( string $name ): void {
-		$this->name = $name;
-	}
-
-	/**
-	 * Sets the group
-	 *
-	 * @param string $group The group
+	 * @param string $group The group name of the chunk.
 	 * @return void
 	 */
 	public function set_group( string $group ): void {
@@ -275,9 +263,9 @@ class Chunk {
 	}
 
 	/**
-	 * Sets the status
+	 * Sets the status.
 	 *
-	 * @param ProcessStatus $status The status
+	 * @param ProcessStatus $status The status.
 	 * @return void
 	 */
 	public function set_status( ProcessStatus $status ): void {
@@ -285,9 +273,9 @@ class Chunk {
 	}
 
 	/**
-	 * Sets the data
+	 * Sets the data of the chunk.
 	 *
-	 * @param array<mixed> $data The data
+	 * @param array<mixed> $data The data of the chunk. Is getting serialized later.
 	 * @return void
 	 */
 	public function set_data( array $data ): void {
@@ -295,20 +283,22 @@ class Chunk {
 	}
 
 	/**
-	 * Sets the start time
+	 * Sets the start time.
 	 *
-	 * @param float $microtime The microtime
+	 * @param float $microtime Start time of chunk processing as microtime.
 	 * @return void
+	 * @throws \DateMalformedStringException Unparsable date.
 	 */
 	public function set_start( float $microtime ): void {
 		$this->start = Helper::convert_microtime_to_datetime( $microtime );
 	}
 
 	/**
-	 * Sets the end time
+	 * Sets the end time.
 	 *
-	 * @param float $microtime The microtime
+	 * @param float $microtime End time of chunk processing as microtime.
 	 * @return void
+	 * @throws \DateMalformedStringException Unparsable date.
 	 */
 	public function set_end( float $microtime ): void {
 		$this->end = Helper::convert_microtime_to_datetime( $microtime );
@@ -317,17 +307,13 @@ class Chunk {
 	/**
 	 * Saves the chunk data to the database
 	 *
-	 * @throws Exception If database operation fails
-	 * @return int the chunk id
+	 * @throws Exception If database operation fails.
+	 * @return int the chunk id.
 	 */
 	public function save(): int {
 		$data = array();
 
 		// Only add fields that have been explicitly set
-		if ( null !== $this->name ) {
-			$data['name'] = $this->name;
-		}
-
 		if ( null !== $this->group ) {
 			$data['group'] = $this->group;
 		}
@@ -363,7 +349,7 @@ class Chunk {
 		}
 
 		if ( empty( $data ) ) {
-			throw new Exception( __( 'Data is empty', 'as-processor' ) ); // Nothing to save
+			throw new Exception( esc_attr__( 'Data is empty', 'as-processor' ) ); // Nothing to save
 		}
 
 		$formats = array();
@@ -380,7 +366,7 @@ class Chunk {
 			);
 
 			if ( false === $result ) {
-				throw new Exception( __( 'Could not insert chunk data!', 'as-processor' ) );
+				throw new Exception( esc_attr__( 'Could not insert chunk data!', 'as-processor' ) );
 			}
 
 			$this->chunk_id = (int) $this->db()->insert_id;
@@ -394,7 +380,7 @@ class Chunk {
 			);
 
 			if ( false === $result ) {
-				throw new Exception( __( 'Failed to update chunk data', 'as-processor' ) );
+				throw new Exception( esc_attr__( 'Failed to update chunk data', 'as-processor' ) );
 			}
 		}
 

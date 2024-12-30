@@ -7,6 +7,7 @@
  *
  * @package juvo\AS_Processor
  */
+
 namespace juvo\AS_Processor;
 
 use Exception;
@@ -24,32 +25,30 @@ trait Chunker {
 	/**
 	 * Schedules an async action to process a chunk of data. Passed items are serialized and added to a chunk.
 	 *
-	 * @param mixed $chunkData The data to be processed in chunks
-	 * @throws Exception When chunk data insertion fails
+	 * @param mixed $chunk_data The data to be processed in chunks.
 	 * @return void
+	 * @throws Exception When chunk data insertion fails.
 	 */
-	protected function schedule_chunk( mixed $chunkData ): void {
+	protected function schedule_chunk( mixed $chunk_data ): void {
 		// update chunk counter
 		if ( property_exists( $this, 'chunk_counter' ) ) {
 			$this->chunk_counter += 1;
 		}
 
 		// check if we have a chunk limit
-		if ( property_exists( $this, 'chunk_limit' ) && property_exists( $this, 'chunk_counter' ) && $this->chunk_limit != 0 && $this->chunk_counter > $this->chunk_limit ) {
+		if ( property_exists( $this, 'chunk_limit' ) && property_exists( $this, 'chunk_counter' ) && 0 != $this->chunk_limit && $this->chunk_counter > $this->chunk_limit ) {
 			return;
 		}
 
 		// convert to array if it's an iterator
-		if ( ! is_array( $chunkData ) ) {
-			$chunkData = iterator_to_array( $chunkData );
+		if ( ! is_array( $chunk_data ) ) {
+			$chunk_data = iterator_to_array( $chunk_data );
 		}
 
 		// create the new chunk
 		$chunk = new Chunk();
-		$chunk->set_name( $this->get_sync_name() );
-		$chunk->set_group( $this->get_sync_group_name() );
 		$chunk->set_status( ProcessStatus::SCHEDULED );
-		$chunk->set_data( $chunkData );
+		$chunk->set_data( $chunk_data );
 		$chunk->save();
 
 		as_enqueue_async_action(
@@ -65,8 +64,8 @@ trait Chunker {
 	 * Callback function for the single chunk jobs.
 	 * This jobs reads the serialized chunk data from the database and processes it.
 	 *
-	 * @param int $chunk_id The ID of the chunk to process
-	 * @throws Exception When chunk data is empty or invalid
+	 * @param int $chunk_id The ID of the chunk to process.
+	 * @throws Exception When chunk data is empty or invalid.
 	 * @return void
 	 */
 	protected function import_chunk( int $chunk_id ): void {
@@ -91,10 +90,10 @@ trait Chunker {
 	/**
 	 * Handles the actual data processing. Should be implemented in the class lowest in hierarchy.
 	 *
-	 * @param Generator<mixed> $chunkData The generator containing chunk data to process
+	 * @param Generator<mixed> $chunk_data The generator containing chunk data to process.
 	 * @return void
 	 */
-	abstract function process_chunk_data( Generator $chunkData ): void;
+	abstract protected function process_chunk_data( Generator $chunk_data ): void;
 
 	/**
 	 * Schedules the cleanup job if not already scheduled.
@@ -138,8 +137,7 @@ trait Chunker {
 		 */
 		$status = apply_filters( 'asp/chunks/cleanup/status', ProcessStatus::ALL );
 
-		$query = '';
-		if ( $status === ProcessStatus::ALL ) {
+		if ( ProcessStatus::ALL === $status ) {
 			$query = $this->db()->prepare(
 				"DELETE FROM {$this->get_chunks_table_name()} WHERE start < %f",
 				$cleanup_timestamp
