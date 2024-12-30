@@ -21,14 +21,14 @@ abstract class Excel extends Import
      *
      * @var int
      */
-    protected int $chunkSize = 1000;
+    protected int $chunk_size = 1000;
 
     /**
      * Defines if a header in the excel file exists
      *
      * @var bool
      */
-    protected bool $hasHeader = true;
+    protected bool $has_header = true;
 
     /**
      * Defines the name of the worksheet to be processed. If none
@@ -43,7 +43,7 @@ abstract class Excel extends Import
      *
      * @var bool
      */
-    protected bool $skipEmptyRows = true;
+    protected bool $skip_empty_rows = true;
 
     /**
      * Gets the path to the excel file
@@ -83,7 +83,7 @@ abstract class Excel extends Import
 
         // get header of file
         $starting_row = 1;
-        if ( $this->hasHeader ) {
+        if ( $this->has_header ) {
             $starting_row = 2;
             $header = $worksheet->rangeToArray('A1:'.$worksheet->getHighestColumn().'1')[0];
         }
@@ -91,7 +91,7 @@ abstract class Excel extends Import
         $chunkData = [];
         $rowIterator = $worksheet->getRowIterator( $starting_row );
         foreach ($rowIterator as $row) {
-            if ( $this->skipEmptyRows && $row->isEmpty( 
+            if ( $this->skip_empty_rows && $row->isEmpty(
 				CellIterator::TREAT_EMPTY_STRING_AS_EMPTY_CELL | 
 				CellIterator::TREAT_NULL_VALUE_AS_EMPTY_CELL )
 			) { // Ignore empty rows
@@ -128,7 +128,7 @@ abstract class Excel extends Import
             $chunkData[] = $rowData;
 
             // schedule chunk and empty chunk data
-            if ( count($chunkData) >= $this->chunkSize ) {
+            if ( count($chunkData) >= $this->chunk_size ) {
                 $this->schedule_chunk($chunkData);
                 $chunkData = [];
             }

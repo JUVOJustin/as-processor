@@ -36,7 +36,7 @@ trait Chunker {
 		}
 
 		// check if we have a chunk limit
-		if ( property_exists( $this, 'chunk_limit' ) && property_exists( $this, 'chunk_counter' ) && 0 != $this->chunk_limit && $this->chunk_counter > $this->chunk_limit ) {
+		if ( property_exists( $this, 'chunk_limit' ) && property_exists( $this, 'chunk_counter' ) && 0 !== $this->chunk_limit && $this->chunk_counter > $this->chunk_limit ) {
 			return;
 		}
 

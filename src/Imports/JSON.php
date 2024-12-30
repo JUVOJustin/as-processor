@@ -22,7 +22,7 @@ abstract class JSON extends Import
      *
      * @var int
      */
-    public int $chunkSize = 10;
+    public int $chunk_size = 10;
 
 	/**
 	 * You can add a JSON Pointer to only get certain data
@@ -66,7 +66,7 @@ abstract class JSON extends Import
 			$chunkData[] = $item;
 
 			// schedule chunk and empty chunk data
-			if ( count($chunkData) >= $this->chunkSize ) {
+			if ( count($chunkData) >= $this->chunk_size ) {
 				$this->schedule_chunk($chunkData);
 				$chunkData = [];
 			}

@@ -12,10 +12,10 @@ use League\Csv\UnavailableStream;
 abstract class CSV_Sync extends Import
 {
 
-    protected int $chunkSize = 5000;
+    protected int $chunk_size = 5000;
     protected string $delimiter = ',';
-    protected bool $hasHeader = true;
-    protected string $srcEncoding = "";
+    protected bool $has_header = true;
+    protected string $src_encoding = "";
 
     abstract protected function get_source_path(): string;
 
@@ -35,7 +35,7 @@ abstract class CSV_Sync extends Import
         $filepath = $this->get_source_path();
 		$wp_filesystem = Helper::get_direct_filesystem();
 
-        if (!$wp_filesystem->is_file($filepath)) {
+        if (!$wp_filesystem->is_file($filepath))     {
             throw new Exception("Failed to open the file: $filepath");
         }
 
@@ -44,17 +44,17 @@ abstract class CSV_Sync extends Import
         $reader->setDelimiter($this->delimiter);
 
         // If src encoding is set convert table to utf-8
-        if (!empty($this->srcEncoding)) {
-            $reader->addStreamFilter("convert.iconv.$this->srcEncoding/UTF-8");
+        if (!empty($this->src_encoding)) {
+            $reader->addStreamFilter("convert.iconv.$this->src_encoding/UTF-8");
         }
 
         // Maybe add header
-        if ($this->hasHeader) {
+        if ($this->has_header) {
             $reader->setHeaderOffset(0);
         }
 
         // Process chunks
-        foreach ($reader->chunkBy($this->chunkSize) as $chunk) {
+        foreach ($reader->chunkBy($this->chunk_size) as $chunk) {
             $this->schedule_chunk($chunk->getRecords());
         }
 
