@@ -195,17 +195,18 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
+		$this->sync_group_name = $action->get_group();
+
 		// set the start time of the chunk
 		$action_arguments = $action->get_args();
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
 			$chunk = new Chunk( $action_arguments['chunk_id'] );
 			$chunk->set_status( ProcessStatus::STARTED );
 			$chunk->set_action_id( $action_id );
+			$chunk->set_group( $this->get_sync_group_name() );
 			$chunk->set_start( microtime( true ) );
 			$chunk->save();
 		}
-
-		$this->sync_group_name = $action->get_group();
 	}
 
 	/**
