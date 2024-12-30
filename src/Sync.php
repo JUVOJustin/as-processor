@@ -75,7 +75,7 @@ abstract class Sync implements Syncable {
 				$this->schedule_chunk_cleanup();
 			}
 		);
-		add_action( 'ASP/Chunks/Cleanup', array( $this, 'cleanup_chunk_data' ) );
+		add_action( 'asp/chunks/cleanup', array( $this, 'cleanup_chunk_data' ) );
 	}
 
 	/**
