@@ -39,7 +39,9 @@ abstract class Sync implements Syncable
         }
 
         // Hookup to error handling if on_fail is present in child
-        add_action('action_scheduler_failed_execution', [$this, 'handle_exception'], 10, 2);
+		add_action('action_scheduler_failed_action', [$this, 'handle_timeout'], 10);
+		add_action('action_scheduler_canceled_action', [$this, 'handle_cancel'], 10);
+		add_action('action_scheduler_failed_execution', [$this, 'handle_exception'], 10, 2);
         if (method_exists($this, 'on_fail')) {
             add_action($this->get_sync_name() . '/fail', [$this, 'on_fail'], 10, 3);
         }
@@ -228,4 +230,65 @@ abstract class Sync implements Syncable
 
         do_action($this->get_sync_name() . '/fail', $action, $e, $action_id);
     }
+
+	/**
+	 * Handles timeout events for a specified action.
+	 *
+	 * Updates the status and end time of the associated chunk and triggers a timeout action hook.
+	 *
+	 * @param int $action_id The ID of the action that timed out.
+	 * @return void
+	 * @throws Exception
+	 */
+	public function handle_timeout(int $action_id): void
+	{
+
+		// Check if action belongs to sync
+		$action = $this->action_belongs_to_sync($action_id);
+		if (!$action || empty($action->get_group())) {
+			return;
+		}
+
+		// set the end time of the chunk
+		$action_arguments = $action->get_args();
+		if ( !empty( $action_arguments['chunk_id'] ) ) {
+			$chunk = new Chunk( $action_arguments['chunk_id'] );
+			$chunk->set_status( ProcessStatus::TIMED_OUT );
+			$chunk->set_end( microtime(TRUE) );
+			$chunk->save();
+		}
+
+		do_action($this->get_sync_name() . '/timeout', $action, $action_id);
+	}
+
+	/**
+	 * Handles the cancellation of an action.
+	 *
+	 * Marks the chunk associated with the action as cancelled, records the end time,
+	 * and triggers a custom action for cancellation.
+	 *
+	 * @param int $action_id The ID of the action to be cancelled.
+	 * @return void
+	 * @throws Exception
+	 */
+	public function handle_cancel(int $action_id): void
+	{
+
+		// Check if action belongs to sync
+		$action = $this->action_belongs_to_sync($action_id);
+		if (!$action || empty($action->get_group())) {
+			return;
+		}
+
+		// set the end time of the chunk
+		$action_arguments = $action->get_args();
+		if ( !empty( $action_arguments['chunk_id'] ) ) {
+			$chunk = new Chunk( $action_arguments['chunk_id'] );
+			$chunk->set_status( ProcessStatus::CANCELLED );
+			$chunk->set_end( microtime(TRUE) );
+			$chunk->save();
+		}
+
+		do_action($this->get_sync_name() . '/cancel', $action, $action_id);
+	}
 }

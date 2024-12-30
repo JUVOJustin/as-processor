@@ -18,4 +18,6 @@ enum ProcessStatus: string
     case RUNNING = 'running';
     case FINISHED = 'finished';
     case FAILED = 'failed';
+	case CANCELLED = 'cancelled';
+	case TIMED_OUT = 'timed-out';
 }
