@@ -22,6 +22,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
+          tools: cs2pr
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,8 +36,17 @@ jobs:
           fail-on-cache-miss: true
         id: cache
 
-      - name: Static Analyse
-        run: composer run test:static
+      - name: PHPSTAN
+        run: composer run phpstan:ci
+
+      - name: PHPCS
+        id: phpcs
+        continue-on-error: true
+        run: composer run phpcs:ci
+
+      - name: Show PHPCS results in PR
+        if: ${{ always() && steps.phpcs.outcome == 'failure' }}
+        run: cs2pr ./phpcs-report.xml --graceful-warnings
 
       - name: PHP Unit Test
         run: composer run test:unit
