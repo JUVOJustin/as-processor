@@ -41,37 +41,16 @@ trait Sync_Data {
 	 *
 	 * @param string $key Key of the sync data to retrieve.
 	 * @return mixed
-	 * @throws Exception Thrown if the data is locked.
 	 */
 	protected function get_sync_data( string $key ): mixed {
-		$delay           = 0.1; // Initial delay in seconds
-		$total_wait_time = 0;
+		$transient = $this->get_transient( $this->get_sync_data_name() . '_' . $key );
 
-		do {
-			try {
-				// Check if the specific key is locked and determine if the current process holds the lock
-				if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
-					throw new Exception( esc_attr__( 'Sync Data is locked', 'as-processor' ) );
-				}
+		// Return false if there's no data
+		if ( empty( $transient ) ) {
+			return false;
+		}
 
-				$transient = $this->get_transient( $this->get_sync_data_name() . '_' . $key );
-
-				// Return false if there's no data
-				if ( empty( $transient ) ) {
-					return false;
-				}
-
-				return $transient;
-			} catch ( Exception ) {
-				usleep( (int) ( $delay * 1000000 ) ); // Convert delay to microseconds
-				$total_wait_time += $delay;
-				$delay           *= 2; // Double the delay
-				continue;
-			}
-		} while ( $total_wait_time < 5 );
-
-		/* translators: Number of attempts */
-		throw new Exception( sprintf( esc_attr__( 'Sync Data is locked. Tried %f seconds.', 'as-processor' ), floatval( $total_wait_time ) ) );
+		return $transient;
 	}
 
 	/**
@@ -151,9 +130,9 @@ trait Sync_Data {
 	 */
 	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
-		$attempts = 0;
+		$delay           = 0.1; // Initial delay in seconds
+		$total_wait_time = 0;
 
-		// Update sync data
 		do {
 			try {
 
@@ -161,6 +140,7 @@ trait Sync_Data {
 				if ( $this->is_locked( $key ) ) {
 					throw new Exception( esc_attr__( 'Lock is already acquired', 'as-processor' ) );
 				}
+
 				$this->set_key_lock( $key, true );
 
 				// Check if values is supposed to be an array
@@ -191,16 +171,16 @@ trait Sync_Data {
 				// Unlock
 				$this->set_key_lock( $key, false );
 				return;
-			} catch ( Exception $e ) {
-				++$attempts;
-				sleep( 1 );
+			} catch ( Exception ) {
+				usleep( (int) ( $delay * 1000000 ) ); // Convert delay to microseconds
+				$total_wait_time += $delay;
+				$delay           *= 2; // Double the delay
 				continue;
 			}
-		} while ( $attempts < 5 );
+		} while ( $total_wait_time < 5 );
 
-		// If this point is reached throw error
 		/* translators: Number of attempts */
-		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data after %d tries', 'as-processor' ), intval( $attempts ) ) );
+		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data. Tried %f seconds.', 'as-processor' ), floatval( $total_wait_time ) ) );
 	}
 
 	/**
