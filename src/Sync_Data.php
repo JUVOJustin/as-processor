@@ -180,7 +180,7 @@ trait Sync_Data {
 		} while ( $total_wait_time < 5 );
 
 		/* translators: Number of attempts */
-		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data. Tried %f seconds.', 'as-processor' ), floatval( $total_wait_time ) ) );
+		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data. Tried %f seconds.', 'as-processor' ), number_format( $total_wait_time, 2 ) ) );
 	}
 
 	/**
