@@ -44,7 +44,8 @@ trait Sync_Data {
 	 * @throws Exception Thrown if the data is locked.
 	 */
 	protected function get_sync_data( string $key ): mixed {
-		$attempts = 0;
+		$delay           = 0.1; // Initial delay in seconds
+		$total_wait_time = 0;
 
 		do {
 			try {
@@ -62,16 +63,15 @@ trait Sync_Data {
 
 				return $transient;
 			} catch ( Exception ) {
-				++$attempts;
-				sleep( 1 );
+				usleep( (int) ( $delay * 1000000 ) ); // Convert delay to microseconds
+				$total_wait_time += $delay;
+				$delay           *= 2; // Double the delay
 				continue;
 			}
-		} while ( $attempts < 5 );
-
-		++$attempts; // Adjust counting for final error
+		} while ( $total_wait_time < 5 );
 
 		/* translators: Number of attempts */
-		throw new Exception( sprintf( esc_attr__( 'Sync Data is locked. Tried %d times', 'as-processor' ), intval( $attempts ) ) );
+		throw new Exception( sprintf( esc_attr__( 'Sync Data is locked. Tried %f seconds.', 'as-processor' ), floatval( $total_wait_time ) ) );
 	}
 
 	/**
