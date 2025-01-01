@@ -214,12 +214,7 @@ class Stats
             return null;
         }
         
-        // Split the timestamp into seconds and microseconds
-        [$seconds, $microseconds] = explode('.', (string) $start);
-        
-        // Create datetime from unix timestamp and add microseconds
-        return (new DateTimeImmutable('@' . $seconds))
-            ->modify(sprintf('+0.%s seconds', $microseconds));
+        return Helper::convert_microtime_to_datetime($start);
     }
     
     /**
@@ -245,12 +240,7 @@ class Stats
             return null;
         }
         
-        // Split the timestamp into seconds and microseconds
-        [$seconds, $microseconds] = explode('.', (string) $end);
-        
-        // Create datetime from unix timestamp and add microseconds
-        return (new DateTimeImmutable('@' . $seconds))
-            ->modify(sprintf('+0.%s seconds', $microseconds));
+        return Helper::convert_microtime_to_datetime($end);
     }
 
     /**

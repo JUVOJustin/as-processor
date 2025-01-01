@@ -24,7 +24,6 @@ use juvo\AS_Processor\Entities\ProcessStatus;
 abstract class Sync implements Syncable {
 
 
-
 	use Sync_Data;
 	use Chunker;
 
@@ -172,7 +171,7 @@ abstract class Sync implements Syncable {
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
 			$chunk = new Chunk( $action_arguments['chunk_id'] );
 			$chunk->set_status( ProcessStatus::FINISHED );
-			$chunk->set_end( microtime( true ) );
+			$chunk->set_end();
 			$chunk->save();
 		}
 
@@ -212,7 +211,7 @@ abstract class Sync implements Syncable {
 			$chunk->set_status( ProcessStatus::STARTED );
 			$chunk->set_action_id( $action_id );
 			$chunk->set_group( $this->get_sync_group_name() );
-			$chunk->set_start( microtime( true ) );
+			$chunk->set_start();
 			$chunk->save();
 		}
 	}
@@ -258,7 +257,7 @@ abstract class Sync implements Syncable {
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
 			$chunk = new Chunk( $action_arguments['chunk_id'] );
 			$chunk->set_status( ProcessStatus::FAILED );
-			$chunk->set_end( microtime( true ) );
+			$chunk->set_end();
 			$chunk->save();
 		}
 
@@ -287,7 +286,7 @@ abstract class Sync implements Syncable {
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
 			$chunk = new Chunk( $action_arguments['chunk_id'] );
 			$chunk->set_status( ProcessStatus::TIMED_OUT );
-			$chunk->set_end( microtime( true ) );
+			$chunk->set_end();
 			$chunk->save();
 		}
 
@@ -317,7 +316,7 @@ abstract class Sync implements Syncable {
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
 			$chunk = new Chunk( $action_arguments['chunk_id'] );
 			$chunk->set_status( ProcessStatus::CANCELLED );
-			$chunk->set_end( microtime( true ) );
+			$chunk->set_end();
 			$chunk->save();
 		}
 
