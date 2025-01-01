@@ -24,6 +24,7 @@ use juvo\AS_Processor\Entities\ProcessStatus;
 abstract class Sync implements Syncable {
 
 
+
 	use Sync_Data;
 	use Chunker;
 
@@ -33,6 +34,13 @@ abstract class Sync implements Syncable {
 	 * @var string
 	 */
 	private string $sync_group_name;
+
+	/**
+	 * ID of th action scheduler action in scope.
+	 *
+	 * @var int
+	 */
+	private int $action_id;
 
 	/**
 	 * Initializes the class instance.
@@ -223,6 +231,8 @@ abstract class Sync implements Syncable {
 			return false;
 		}
 
+		$this->action_id = $action_id;
+
 		return $action;
 	}
 
@@ -312,5 +322,25 @@ abstract class Sync implements Syncable {
 		}
 
 		do_action( $this->get_sync_name() . '/cancel', $action, $action_id );
+	}
+
+	/**
+	 * Logs a message associated with the current action ID.
+	 *
+	 * If no action ID is available, the log operation is skipped.
+	 *
+	 * @param string $message The message to be logged.
+	 * @return void
+	 */
+	private function log( string $message ) {
+
+		if ( ! $this->action_id ) {
+			return;
+		}
+
+		ActionScheduler::logger()->log(
+			$this->action_id,
+			$message
+		);
 	}
 }

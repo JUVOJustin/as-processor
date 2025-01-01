@@ -8,6 +8,7 @@
 namespace juvo\AS_Processor;
 
 use Exception;
+use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
 
 /**
  * Trait Sync_Data
@@ -18,6 +19,7 @@ use Exception;
  * It also supports advanced merging and concatenating options for array-type synchronization data.
  */
 trait Sync_Data {
+
 
 
 	/**
@@ -91,27 +93,6 @@ trait Sync_Data {
 	}
 
 	/**
-	 * Stores data in a transient to be access in other jobs.
-	 * This can be used e.g. to build a delta of post ids.
-	 *
-	 * Only sets the data if locked by itself.
-	 *
-	 * @param string $key The key where the data should be stored.
-	 * @param mixed  $data The data that should be stored.
-	 * @param int    $expiration The TTL of the data before WordPress´s transient handling is free to delete it.
-	 * @return void
-	 * @throws Exception Thrown if the data is locked.
-	 */
-	protected function set_sync_data( string $key, mixed $data, int $expiration = HOUR_IN_SECONDS * 6 ): void {
-		if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
-			throw new Exception( 'Sync Data is locked' );
-		}
-
-		// Store the actual data
-		set_transient( $this->get_sync_data_name() . '_' . $key, $data, $expiration );
-	}
-
-	/**
 	 * Updates synchronization data with new values, applying optional merge strategies.
 	 *
 	 * This method retrieves the current data associated with the given key, applies the specified updates,
@@ -126,7 +107,8 @@ trait Sync_Data {
 	 *
 	 * @return void
 	 *
-	 * @throws Exception If the data update fails after multiple attempts.
+	 * @throws Sync_Data_Lock_Exception If the data update fails after multiple attempts.
+	 * @throws Exception Thrown when the maximum backoff time is reached and the process failed.
 	 */
 	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
@@ -137,8 +119,9 @@ trait Sync_Data {
 			try {
 
 				// Lock data first
-				if ( $this->is_locked( $key ) ) {
-					throw new Exception( esc_attr__( 'Lock is already acquired', 'as-processor' ) );
+				if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
+					/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
+					throw new Sync_Data_Lock_Exception( sprintf( esc_attr__( 'Lock for "%1$s" is already acquired by another process. Waited %2$f seconds', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
 				}
 
 				$this->set_key_lock( $key, true );
@@ -166,12 +149,14 @@ trait Sync_Data {
 				}
 
 				// Save the updated data back into the transient.
-				$this->set_sync_data( $key, $updates, $expiration );
+				set_transient( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
 
 				// Unlock
 				$this->set_key_lock( $key, false );
 				return;
-			} catch ( Exception ) {
+			} catch ( Sync_Data_Lock_Exception $e ) {
+				$this->log( $e->getMessage() );
+
 				usleep( (int) ( $delay * 1000000 ) ); // Convert delay to microseconds
 				$total_wait_time += $delay;
 				$delay           *= 2; // Double the delay
@@ -179,8 +164,8 @@ trait Sync_Data {
 			}
 		} while ( $total_wait_time < 5 );
 
-		/* translators: Number of attempts */
-		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data. Tried %f seconds.', 'as-processor' ), number_format( $total_wait_time, 2 ) ) );
+		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
+		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data "%1$s". Tried %2$f seconds.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
 	}
 
 	/**
