@@ -20,8 +20,6 @@ use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
  */
 trait Sync_Data {
 
-
-
 	/**
 	 * Sync Data Name.
 	 * Each data key is stored in a separate transient with the scheme "$this->sync_data_name_$key".
@@ -162,7 +160,7 @@ trait Sync_Data {
 				$delay           *= 2; // Double the delay
 				continue;
 			}
-		} while ( $total_wait_time < 5 );
+		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $key, $total_wait_time ) ) );
 
 		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
 		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data "%1$s". Tried %2$s seconds.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
