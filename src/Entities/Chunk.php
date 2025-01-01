@@ -297,8 +297,8 @@ class Chunk {
 	 */
 	public function set_start( ?string $microtime = null ): void {
 
-		if (empty($microtime)) {
-			$microtime = (string) microtime(true);
+		if ( empty( $microtime ) ) {
+			$microtime = (string) microtime( true );
 		}
 
 		$this->start = Helper::convert_microtime_to_datetime( $microtime );
@@ -312,8 +312,8 @@ class Chunk {
 	 */
 	public function set_end( ?string $microtime = null ): void {
 
-		if (empty($microtime)) {
-			$microtime = (string) microtime(true);
+		if ( empty( $microtime ) ) {
+			$microtime = (string) microtime( true );
 		}
 
 		$this->end = Helper::convert_microtime_to_datetime( $microtime );

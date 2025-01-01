@@ -70,7 +70,7 @@ class Helper {
 			return null;
 		}
 
-		return DateTimeImmutable::createFromFormat('U.u', $microtime);
+		return DateTimeImmutable::createFromFormat( 'U.u', $microtime );
 	}
 
 	/**
