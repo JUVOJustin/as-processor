@@ -292,22 +292,30 @@ class Chunk {
 	/**
 	 * Sets the start time.
 	 *
-	 * @param string $microtime Start time of chunk processing as microtime.
+	 * @param string|null $microtime Start time of chunk processing as microtime.
 	 * @return void
-	 * @throws Exception Unparsable Date.
 	 */
-	public function set_start( string $microtime ): void {
+	public function set_start( ?string $microtime = null ): void {
+
+		if (empty($microtime)) {
+			$microtime = (string) microtime(true);
+		}
+
 		$this->start = Helper::convert_microtime_to_datetime( $microtime );
 	}
 
 	/**
 	 * Sets the end time.
 	 *
-	 * @param string $microtime End time of chunk processing as microtime.
+	 * @param string|null $microtime End time of chunk processing as microtime.
 	 * @return void
-	 * @throws Exception Unparsable Date.
 	 */
-	public function set_end( string $microtime ): void {
+	public function set_end( ?string $microtime = null ): void {
+
+		if (empty($microtime)) {
+			$microtime = (string) microtime(true);
+		}
+
 		$this->end = Helper::convert_microtime_to_datetime( $microtime );
 	}
 
