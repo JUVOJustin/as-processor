@@ -18,7 +18,7 @@ use SplQueue;
  * The class ensures that each task in the sequence is properly handled and allows
  * for the registration of hooks for sync-specific operations.
  */
-abstract class Sequential_Sync implements Syncable {
+abstract class Sequential_Sync extends Sync implements Syncable {
 
 
 	use Sync_Data;
@@ -82,6 +82,8 @@ abstract class Sequential_Sync implements Syncable {
 	 * @return void
 	 */
 	public function __construct() {
+		parent::__construct();
+
 		$this->sync_data_name = $this->get_sync_name();
 
 		// Run always on initialisation

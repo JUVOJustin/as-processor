@@ -35,6 +35,13 @@ abstract class Sync implements Syncable {
 	private string $sync_group_name;
 
 	/**
+	 * ID of the action scheduler action in scope.
+	 *
+	 * @var int
+	 */
+	private int $action_id;
+
+	/**
 	 * Initializes the class instance.
 	 *
 	 * Calls the necessary hooks and sets up the environment required for the instance.
@@ -223,6 +230,8 @@ abstract class Sync implements Syncable {
 			return false;
 		}
 
+		$this->action_id = $action_id;
+
 		return $action;
 	}
 
@@ -312,5 +321,25 @@ abstract class Sync implements Syncable {
 		}
 
 		do_action( $this->get_sync_name() . '/cancel', $action, $action_id );
+	}
+
+	/**
+	 * Logs a message associated with the current action ID.
+	 *
+	 * If no action ID is available, the log operation is skipped.
+	 *
+	 * @param string $message The message to be logged.
+	 * @return void
+	 */
+	protected function log( string $message ) {
+
+		if ( ! $this->action_id ) {
+			return;
+		}
+
+		ActionScheduler::logger()->log(
+			$this->action_id,
+			$message
+		);
 	}
 }
