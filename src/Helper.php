@@ -57,27 +57,20 @@ class Helper {
 	}
 
 	/**
-	 * Converts a microtime value to a DateTimeImmutable object.
+	 * Converts a microtime string to a DateTimeImmutable object.
 	 *
-	 * This method takes a floating-point microtime value and converts it to a
-	 * DateTimeImmutable object. If the input is null, it returns null.
+	 * This method parses a string representation of microtime and converts it into
+	 * an immutable DateTime object. If the input is null, the method will return null.
 	 *
-	 * @param float|null $microtime The microtime value to convert, or null.
-	 * @return DateTimeImmutable|null Returns a DateTimeImmutable object representing the given microtime value, or null if input is null.
-	 * @throws Exception Unparsable date format.
+	 * @param string|null $microtime The microtime string to be converted. Can be null.
+	 * @return DateTimeImmutable|null Returns a DateTimeImmutable object if the conversion is successful, otherwise null.
 	 */
-	public static function convert_microtime_to_datetime( ?float $microtime ): ?DateTimeImmutable {
+	public static function convert_microtime_to_datetime( ?string $microtime ): ?DateTimeImmutable {
 		if ( null === $microtime ) {
 			return null;
 		}
 
-		// Split into seconds and microseconds
-		$seconds      = (int) floor( $microtime );
-		$microseconds = (int) ( ( $microtime - $seconds ) * 1000000 );
-
-		return ( new DateTimeImmutable() )
-			->setTimestamp( $seconds )
-			->modify( "+{$microseconds} microseconds" );
+		return DateTimeImmutable::createFromFormat('U.u', $microtime);
 	}
 
 	/**
