@@ -121,7 +121,7 @@ trait Sync_Data {
 				// Lock data first
 				if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
 					/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
-					throw new Sync_Data_Lock_Exception( sprintf( esc_attr__( 'Lock for "%1$s" is already acquired by another process. Waited %2$f seconds', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
+					throw new Sync_Data_Lock_Exception( sprintf( esc_attr__( 'Lock for "%1$s" is already acquired by another process. Waited %2$s seconds to acquire the lock.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
 				}
 
 				$this->set_key_lock( $key, true );
@@ -165,7 +165,7 @@ trait Sync_Data {
 		} while ( $total_wait_time < 5 );
 
 		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
-		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data "%1$s". Tried %2$f seconds.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
+		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data "%1$s". Tried %2$s seconds.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
 	}
 
 	/**
