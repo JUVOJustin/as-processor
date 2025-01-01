@@ -321,6 +321,14 @@ class Stats
         $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), $this->get_slowest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
         $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), $this->get_fastest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
 
+		// Append custom data if available
+		if (!empty($custom_data)) {
+			$email_text .= "\n-- " . __("Custom Data:", 'as-processor') . " --\n";
+			foreach ($custom_data as $key => $value) {
+				$email_text .= sprintf(__("%s: %s", 'as-processor'), ucfirst($key), (is_array($value) ? json_encode($value) : $value)) . "\n";
+			}
+		}
+
         // Failed actions
         $failed_actions = $this->get_actions_by_status(ProcessStatus::FAILED);
         if (!empty($failed_actions)) {
@@ -334,18 +342,11 @@ class Stats
                 if ($action['status'] === 'failed') {
                     $email_text .= __("Log Messages:", 'as-processor') . "\n";
                     foreach ( $chunk->get_logs() as $message ) {
-                        $email_text .= sprintf(__("%s", 'as-processor'), $message) . "\n";
+						$decoded_message = htmlspecialchars_decode($message, ENT_QUOTES);
+						$email_text .= sprintf(__("%s", 'as-processor'), $decoded_message) . "\n";
                     }
                 }
                 $email_text .= "\n";
-            }
-        }
-
-        // Append custom data if available
-        if (!empty($custom_data)) {
-            $email_text .= "\n-- " . __("Custom Data:", 'as-processor') . " --\n";
-            foreach ($custom_data as $key => $value) {
-                $email_text .= sprintf(__("%s: %s", 'as-processor'), ucfirst($key), (is_array($value) ? json_encode($value) : $value)) . "\n";
             }
         }
 
