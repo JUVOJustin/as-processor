@@ -36,7 +36,7 @@ abstract class Sync implements Syncable {
 	private string $sync_group_name;
 
 	/**
-	 * ID of th action scheduler action in scope.
+	 * ID of the action scheduler action in scope.
 	 *
 	 * @var int
 	 */
@@ -332,7 +332,7 @@ abstract class Sync implements Syncable {
 	 * @param string $message The message to be logged.
 	 * @return void
 	 */
-	private function log( string $message ) {
+	protected function log( string $message ) {
 
 		if ( ! $this->action_id ) {
 			return;
