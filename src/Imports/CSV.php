@@ -9,7 +9,7 @@ use League\Csv\InvalidArgument;
 use League\Csv\Reader;
 use League\Csv\UnavailableStream;
 
-abstract class CSV_Sync extends Import
+abstract class CSV extends Import
 {
 
     protected int $chunk_size = 5000;
