@@ -18,8 +18,9 @@ use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
  * proper locking and concurrency handling.
  * It also supports advanced merging and concatenating options for array-type synchronization data.
  */
-trait Sync_Data
-{
+trait Sync_Data {
+
+
 
 	/**
 	 * Sync Data Name.
@@ -36,12 +37,11 @@ trait Sync_Data
 	 * @param string $key Key of the sync data to retrieve.
 	 * @return mixed
 	 */
-	protected function get_sync_data(string $key): mixed
-	{
-		$transient = $this->get_option($this->get_sync_data_name() . '_' . $key);
+	protected function get_sync_data( string $key ): mixed {
+		$transient = $this->get_option( $this->get_sync_data_name() . '_' . $key );
 
 		// Return false if there's no data
-		if (empty($transient)) {
+		if ( empty( $transient ) ) {
 			return false;
 		}
 
@@ -54,10 +54,9 @@ trait Sync_Data
 	 *
 	 * @return string
 	 */
-	public function get_sync_data_name(): string
-	{
+	public function get_sync_data_name(): string {
 		// Set sync data key to the group name by default. Sequential Sync does not have a group name
-		if (empty($this->sync_data_name) && method_exists($this, 'get_sync_group_name')) {
+		if ( empty( $this->sync_data_name ) && method_exists( $this, 'get_sync_group_name' ) ) {
 			$this->sync_data_name = $this->get_sync_group_name();
 			return $this->sync_data_name;
 		}
@@ -72,8 +71,7 @@ trait Sync_Data
 	 * @param string $sync_data_name The name to be assigned to the synchronization data.
 	 * @return void
 	 */
-	public function set_sync_data_name(string $sync_data_name): void
-	{
+	public function set_sync_data_name( string $sync_data_name ): void {
 		$this->sync_data_name = $sync_data_name;
 	}
 
@@ -81,90 +79,84 @@ trait Sync_Data
 	 * Updates synchronization data directly in the options table.
 	 *
 	 * @param string $key The key identifying the synchronization data to update.
-	 * @param mixed $updates The data to update the synchronization data with.
-	 * @param bool $deep_merge Optional. Whether to perform a deep merge of arrays. Default is false.
-	 * @param bool $concat_arrays Optional. Whether to concatenate arrays instead of overriding. Default is false.
-	 * @param int $expiration Optional. The expiration time (in seconds) for the updated data. Default is 6 hours.
+	 * @param mixed  $updates The data to update the synchronization data with.
+	 * @param bool   $deep_merge Optional. Whether to perform a deep merge of arrays. Default is false.
+	 * @param bool   $concat_arrays Optional. Whether to concatenate arrays instead of overriding. Default is false.
+	 * @param int    $expiration Optional. The expiration time (in seconds) for the updated data. Default is 6 hours.
 	 *
 	 * @return void
 	 * @throws Sync_Data_Lock_Exception If the data update fails due to conflicting locks.
 	 * @throws Exception If the maximum retry time is reached.
 	 */
-	protected function update_sync_data(string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6): void
-	{
+	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
-		$delay = 0.1; // Initial delay in seconds
+		$delay           = 0.1; // Initial delay in seconds
 		$total_wait_time = 0;
 
 		do {
 			try {
 				// Set lock
-				$this->set_key_lock($key, true);
+				$this->set_key_lock( $key, true );
 
 				// Handle merging logic
-				if ($deep_merge || $concat_arrays) {
+				if ( $deep_merge || $concat_arrays ) {
 
 					// Retrieve the current data.
-					$current_data = $this->get_sync_data($key);
+					$current_data = $this->get_sync_data( $key );
 
 					// If current data not initialized yet make it an array
-					if (!$current_data) {
+					if ( ! $current_data ) {
 						$current_data = array();
 					}
 
-					if (is_array($current_data) && is_array($updates)) {
-						$updates = Helper::merge_arrays($current_data, $updates, $deep_merge, $concat_arrays);
+					if ( is_array( $current_data ) && is_array( $updates ) ) {
+						$updates = Helper::merge_arrays( $current_data, $updates, $deep_merge, $concat_arrays );
 					}
 				}
 
 				// Save the updated data back into the transient.
-				set_transient($this->get_sync_data_name() . '_' . $key, $updates, $expiration);
+				set_transient( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
 
 				// Release lock
-				$this->set_key_lock($key, false);
+				$this->set_key_lock( $key, false );
 
 				return;
-			} catch (Sync_Data_Lock_Exception $e) {
-				$this->log($e->getMessage());
+			} catch ( Sync_Data_Lock_Exception $e ) {
+				$this->log( $e->getMessage() );
 
-				usleep((int)($delay * 1000000)); // Convert delay to microseconds
+				usleep( (int) ( $delay * 1000000 ) ); // Convert delay to microseconds
 				$total_wait_time += $delay;
-				$delay *= 2; // Double the delay
-				continue;
+				$delay           *= 2; // Double the delay
 			}
-		} while ($total_wait_time < floatval(apply_filters('asp/sync_data/max_wait_time', 5, $key, $total_wait_time)));
-
-		// Cleanup the failed lock before throwing an exception
-		$this->set_key_lock($key, false);
+		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $key, $total_wait_time ) ) );
 
 		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
-		throw new Exception(sprintf(esc_attr__('Failed to update sync data "%1$s". Tried %2$s seconds.', 'as-processor'), esc_attr($key), number_format($total_wait_time, 2)));
+		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data "%1$s". Tried %2$s seconds.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
 	}
 
 	/**
 	 * Set a lock state for a specific key with an optional expiration (TTL).
 	 *
 	 * @param string $key The key for which the lock state is being set.
-	 * @param bool $state Determines whether to enable (true) or disable (false) the key lock.
+	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
 	 * @return void
 	 * @throws Sync_Data_Lock_Exception When the current lock is set by another process.
 	 */
-	protected function set_key_lock(string $key, bool $state): void
-	{
-		$lock_key = $this->get_sync_data_name() . '_' . $key . '_lock';
-		$lock_content = $this->get_option($lock_key);
+	protected function set_key_lock( string $key, bool $state ): void {
+		$lock_key     = $this->get_sync_data_name() . '_' . $key . '_lock';
+		$lock_content = $this->get_option( $lock_key );
 
-		if ($lock_content && $lock_content !== getmypid()) {
-			throw new Sync_Data_Lock_Exception(sprintf('Another process owns the lock for %s', $lock_key));
+		if ( $lock_content && getmypid() !== $lock_content ) {
+			throw new Sync_Data_Lock_Exception( esc_attr( sprintf( 'Another process owns the lock for %s', $lock_key ) ) );
 		}
 
-		if ($state) {
-			$lock_ttl = apply_filters('asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key);
+		if ( $state ) {
+			$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key );
 
 			// Setting the lock with the pid
-			$this->update_option($lock_key, getmypid(), $lock_ttl);
+			$this->update_option( $lock_key, getmypid(), $lock_ttl );
 		} else {
-			delete_option($lock_key);
+			delete_option( $lock_key );
 		}
 	}
 
@@ -182,20 +174,19 @@ trait Sync_Data
 	 * @param string $key Key of the transient to get.
 	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
 	 */
-	private function get_option(string $key)
-	{
+	private function get_option( string $key ) {
 
-		if (!wp_using_ext_object_cache()) {
+		if ( ! wp_using_ext_object_cache() ) {
 
 			// Delete transient cache
-			wp_cache_delete($key, 'options');
-			$data = get_option($key);
+			wp_cache_delete( $key, 'options' );
+			$data = get_option( $key );
 		} else {
-			$data = wp_cache_get($key, 'transient', true);
+			$data = wp_cache_get( $key, 'transient', true );
 		}
 
-		if( empty($data['value']) || isset( $data['timestamp'] ) && $data['timestamp'] < time()) {
-			delete_option($key);
+		if ( empty( $data['value'] ) || ( isset( $data['timestamp'] ) && $data['timestamp'] < time() ) ) {
+			delete_option( $key );
 		}
 
 		return $data['value'];
@@ -205,45 +196,51 @@ trait Sync_Data
 	 * Updates an option in the options table with a new value and timestamp.
 	 *
 	 * @param string $key The option name or key to update.
-	 * @param mixed $value The new value to be stored.
-	 * @param int $timestamp The timestamp offset to be added to the current time.
+	 * @param mixed  $value The new value to be stored.
+	 * @param int    $timestamp The timestamp offset to be added to the current time.
 	 * @return bool True if the option value was successfully updated, false otherwise.
 	 */
-	protected function update_option(string $key, mixed $value, int $timestamp): bool
-	{
-		return update_option($key, [
-			'timestamp' => time() + $timestamp,
-			'value' => $value
-		], false);
+	protected function update_option( string $key, mixed $value, int $timestamp ): bool {
+		return update_option(
+			$key,
+			array(
+				'timestamp' => time() + $timestamp,
+				'value'     => $value,
+			),
+			false
+		);
 	}
 
 	/**
-	 * Delete all locks of a sync from the options table
+	 * Cleans up synchronization-related data from the options table.
 	 *
-	 * @param string $force_delete_group
+	 * This method removes or processes options from the database that are associated with a specific synchronization prefix or group.
+	 * It either deletes matching groups or tries to get the value what automatically checks if the time limit is reached and deletes the option when needed.
+	 *
+	 * @param string $force_delete_group Optional. A group identifier to forcefully delete matching options. Defaults to an empty string.
 	 * @return void
 	 */
-	protected function cleanup_sync_data(string $force_delete_group = ""): void
-	{
+	protected function cleanup_sync_data( string $force_delete_group = '' ): void {
 		global $wpdb;
 
 		// Query options table for keys matching the pattern.
-		$query = $wpdb->prepare("
+		$results = $wpdb->get_results(
+			"
         SELECT option_name 
         FROM {$wpdb->options} 
-        WHERE option_name LIKE %%asp");
+        WHERE option_name LIKE %%asp",
+			ARRAY_A
+		);
 
-		$results = $wpdb->get_results($query, ARRAY_A);
-
-		foreach ($results as $row) {
+		foreach ( $results as $row ) {
 			$option_name = $row['option_name'];
 
 			// Maybe force delete option
-			if (!empty($force_delete_group) && str_contains($option_name, $force_delete_group)) {
-				delete_option($option_name);
+			if ( ! empty( $force_delete_group ) && str_contains( $option_name, $force_delete_group ) ) {
+				delete_option( $option_name );
 			}
 
-			$this->get_option($option_name);
+			$this->get_option( $option_name );
 		}
 	}
 }
