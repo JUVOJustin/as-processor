@@ -24,6 +24,7 @@ use juvo\AS_Processor\Entities\ProcessStatus;
 abstract class Sync implements Syncable {
 
 
+
 	use Sync_Data;
 	use Chunker;
 
@@ -39,7 +40,7 @@ abstract class Sync implements Syncable {
 	 *
 	 * @var int
 	 */
-	private int $action_id;
+	protected int $action_id;
 
 	/**
 	 * Initializes the class instance.
@@ -324,14 +325,19 @@ abstract class Sync implements Syncable {
 	}
 
 	/**
-	 * Logs a message associated with the current action ID.
+	 * Logs a message with the specified log level and triggers a WordPress error.
 	 *
-	 * If no action ID is available, the log operation is skipped.
+	 * Logs the message using ActionScheduler associated with the current action ID.
+	 * Additionally, triggers a WordPress error with the provided details.
 	 *
-	 * @param string $message The message to be logged.
+	 * @param string                                                                   $message The message to log.
+	 * @param int-mask-of<E_USER_ERROR|E_USER_WARNING|E_USER_NOTICE|E_USER_DEPRECATED> $log_level The log level for the WordPress error. Defaults to E_USER_NOTICE.
+	 * @param string|null                                                              $function_name The name of the function triggering the log. Defaults to the current function name.
 	 * @return void
+	 *
+	 * @throws \Exception Thrown when log-level is E_USER_ERROR and WP_DEBUG is true.
 	 */
-	protected function log( string $message ) {
+	protected function log( string $message, int $log_level = E_USER_NOTICE, ?string $function_name = null ): void {
 
 		if ( ! $this->action_id ) {
 			return;
@@ -340,6 +346,22 @@ abstract class Sync implements Syncable {
 		ActionScheduler::logger()->log(
 			$this->action_id,
 			$message
+		);
+
+		if ( empty( $function_name ) && WP_DEBUG ) {
+			$backtrace = debug_backtrace(); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
+			$function_name = $backtrace[1]['function'] ?? __FUNCTION__;
+		}
+
+		wp_trigger_error(
+			$function_name,
+			sprintf(
+				'[action_id: %d] [group: %s] %s',
+				$this->action_id,
+				$this->sync_group_name ?? 'undefined',
+				$message
+			),
+			$log_level
 		);
 	}
 }
