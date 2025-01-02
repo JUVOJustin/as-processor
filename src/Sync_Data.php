@@ -149,13 +149,13 @@ trait Sync_Data {
 			throw new Sync_Data_Lock_Exception( esc_attr( sprintf( 'Another process owns the lock for %s', $lock_key ) ) );
 		}
 
-		if ( $state ) {
-			$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key );
+		$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key );
 
+		if ( $state ) {
 			// Setting the lock with the pid
 			$this->update_option( $lock_key, getmypid(), $lock_ttl );
 		} else {
-			delete_option( $lock_key );
+			$this->update_option( $lock_key, false, $lock_ttl );
 		}
 	}
 
@@ -185,7 +185,7 @@ trait Sync_Data {
 		}
 
 		if ( empty( $data['value'] ) || ( isset( $data['timestamp'] ) && $data['timestamp'] < time() ) ) {
-			delete_option( $key );
+			return false;
 		}
 
 		return $data['value'];
@@ -239,7 +239,9 @@ trait Sync_Data {
 				delete_option( $option_name );
 			}
 
-			$this->get_option( $option_name );
+			if(!$this->get_option( $option_name )) {
+				delete_option( $option_name );
+			}
 		}
 	}
 }
