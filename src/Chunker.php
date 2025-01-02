@@ -96,25 +96,6 @@ trait Chunker {
 	abstract protected function process_chunk_data( Generator $chunk_data ): void;
 
 	/**
-	 * Schedules the cleanup job if not already scheduled.
-	 * Creates a daily cron job at midnight to clean up old chunk data.
-	 *
-	 * @return void
-	 */
-	public function schedule_chunk_cleanup(): void {
-		if ( as_has_scheduled_action( 'asp/chunks/cleanup' ) ) {
-			return;
-		}
-
-		// schedule the cleanup midnight every day
-		as_schedule_cron_action(
-			time(),
-			'0 0 * * *',
-			'asp/chunks/cleanup'
-		);
-	}
-
-	/**
 	 * Cleans the chunk data table from data with following properties:
 	 * - older than 2 days (start)
 	 * - status must be finished

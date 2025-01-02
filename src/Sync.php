@@ -24,7 +24,6 @@ use juvo\AS_Processor\Entities\ProcessStatus;
 abstract class Sync implements Syncable {
 
 	use Sync_Data;
-	use Chunker;
 
 	/**
 	 * Name of the group the sync belongs to
@@ -74,13 +73,11 @@ abstract class Sync implements Syncable {
 		}
 
 		// Hooks for chunk cleanup
-		add_action(
-			'init',
-			function () {
-				$this->schedule_chunk_cleanup();
-			}
-		);
-		add_action( 'asp/chunks/cleanup', array( $this, 'cleanup_chunk_data' ) );
+		add_action('init', array ($this, 'schedule_chunk_cleanup') );
+		if ( method_exists( $this, 'cleanup_chunk_data' ) ) {
+			add_action( 'asp/chunks/cleanup', array( $this, 'cleanup_chunk_data' ) );
+		}
+
 	}
 
 	/**
@@ -89,14 +86,6 @@ abstract class Sync implements Syncable {
 	 * @return string
 	 */
 	abstract public function get_sync_name(): string;
-
-	/**
-	 * Callback for the Chunk jobs. The child implementation either dispatches to an import or an export
-	 *
-	 * @param int $chunk_id Database ID of the chunk that should be processed.
-	 * @return void
-	 */
-	abstract protected function process_chunk( int $chunk_id ): void;
 
 	/**
 	 * Returns the sync group name. If none set it will generate one from the sync name and the current time
@@ -359,6 +348,25 @@ abstract class Sync implements Syncable {
 				$message
 			),
 			$log_level
+		);
+	}
+
+	/**
+	 * Schedules the cleanup job if not already scheduled.
+	 * Creates a daily cron job at midnight to clean up old chunk data.
+	 *
+	 * @return void
+	 */
+	public function schedule_chunk_cleanup(): void {
+		if ( as_has_scheduled_action( 'asp/chunks/cleanup' ) ) {
+			return;
+		}
+
+		// schedule the cleanup midnight every day
+		as_schedule_cron_action(
+			time(),
+			'0 0 * * *',
+			'asp/chunks/cleanup'
 		);
 	}
 }

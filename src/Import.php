@@ -22,6 +22,8 @@ use Exception;
  */
 abstract class Import extends Sync {
 
+	use Chunker;
+
 	/**
 	 * Counter to keep track of the number of processed chunks.
 	 *
@@ -43,8 +45,8 @@ abstract class Import extends Sync {
 	 */
 	public function set_hooks(): void {
 		parent::set_hooks();
-		add_action( $this->get_sync_name(), array( $this, 'split_data_into_chunks' ) );
 		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
+		add_action( $this->get_sync_name(), array( $this, 'split_data_into_chunks' ) );
 	}
 
 	/**
