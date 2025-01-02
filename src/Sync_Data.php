@@ -174,6 +174,7 @@ trait Sync_Data {
 	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
 	 */
 	private function get_option( string $key ) {
+		$key = 'asp_' . $key;
 
 		if ( ! wp_using_ext_object_cache() ) {
 
@@ -201,7 +202,7 @@ trait Sync_Data {
 	 */
 	protected function update_option( string $key, mixed $value, int $timestamp ): bool {
 		return update_option(
-			$key,
+			'asp_' . $key,
 			array(
 				'timestamp' => time() + $timestamp,
 				'value'     => $value,
@@ -227,7 +228,7 @@ trait Sync_Data {
 			"
         SELECT option_name 
         FROM {$wpdb->options} 
-        WHERE option_name LIKE %%asp",
+        WHERE option_name LIKE %%asp_",
 			ARRAY_A
 		);
 
