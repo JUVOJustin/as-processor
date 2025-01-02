@@ -94,12 +94,12 @@ abstract class Sync implements Syncable {
 				// schedule the cleanup midnight every day
 				as_schedule_cron_action(
 					time(),
-					'0 * * * *',
+					'0 0 * * *',
 					'asp/sync_data/cleanup'
 				);
 			}
 		);
-		add_action( 'asp/chunks/cleanup', array( $this, 'cleanup_sync_data' ) );
+		add_action( 'asp/sync_data/cleanup', array( $this, 'cleanup_sync_data' ) );
 	}
 
 	/**
