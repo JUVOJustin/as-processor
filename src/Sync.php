@@ -23,8 +23,6 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  */
 abstract class Sync implements Syncable {
 
-
-
 	use Sync_Data;
 	use Chunker;
 
@@ -349,7 +347,7 @@ abstract class Sync implements Syncable {
 		);
 
 		if ( empty( $function_name ) && WP_DEBUG ) {
-			$backtrace = debug_backtrace(); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
+			$backtrace     = debug_backtrace(); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
 			$function_name = $backtrace[1]['function'] ?? __FUNCTION__;
 		}
 
