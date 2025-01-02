@@ -174,7 +174,9 @@ trait Sync_Data {
 	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
 	 */
 	private function get_option( string $key ) {
-		$key = 'asp_' . $key;
+		if (!str_contains($key, 'asp_')) {
+			$key = 'asp_' . $key;
+		}
 
 		if ( ! wp_using_ext_object_cache() ) {
 
@@ -201,8 +203,12 @@ trait Sync_Data {
 	 * @return bool True if the option value was successfully updated, false otherwise.
 	 */
 	protected function update_option( string $key, mixed $value, int $timestamp ): bool {
+		if (!str_contains($key, 'asp_')) {
+			$key = 'asp_' . $key;
+		}
+
 		return update_option(
-			'asp_' . $key,
+			$key,
 			array(
 				'timestamp' => time() + $timestamp,
 				'value'     => $value,
@@ -225,10 +231,13 @@ trait Sync_Data {
 
 		// Query options table for keys matching the pattern.
 		$results = $wpdb->get_results(
-			"
-        SELECT option_name 
-        FROM {$wpdb->options} 
-        WHERE option_name LIKE %%asp_",
+			$wpdb->prepare(
+				"
+           SELECT option_name 
+           FROM {$wpdb->options} 
+           WHERE option_name LIKE %s",
+				'asp_%' // sanitize the LIKE pattern
+			),
 			ARRAY_A
 		);
 
