@@ -85,7 +85,6 @@ trait Sync_Data {
 	 * @param int    $expiration Optional. The expiration time (in seconds) for the updated data. Default is 6 hours.
 	 *
 	 * @return void
-	 * @throws Sync_Data_Lock_Exception If the data update fails due to conflicting locks.
 	 * @throws Exception If the maximum retry time is reached.
 	 */
 	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
