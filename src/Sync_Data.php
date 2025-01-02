@@ -219,7 +219,7 @@ trait Sync_Data {
 	 * @param string $force_delete_group Optional. A group identifier to forcefully delete matching options. Defaults to an empty string.
 	 * @return void
 	 */
-	protected function cleanup_sync_data( string $force_delete_group = '' ): void {
+	public function cleanup_sync_data( string $force_delete_group = '' ): void {
 		global $wpdb;
 
 		// Query options table for keys matching the pattern.
