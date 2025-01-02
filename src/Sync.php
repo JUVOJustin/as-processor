@@ -59,7 +59,6 @@ abstract class Sync implements Syncable {
 	public function set_hooks(): void {
 		add_action( 'action_scheduler_begin_execute', array( $this, 'track_action_start' ), 10, 1 );
 		add_action( 'action_scheduler_completed_action', array( $this, 'maybe_trigger_last_in_group' ) );
-		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
 
 		// If the child, has the callback, we hook it up
 		if ( method_exists( $this, 'after_sync_complete' ) ) {
