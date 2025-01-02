@@ -98,7 +98,9 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 		add_action( $this->get_sync_name(), array( $this, 'callback' ) );
 
 		// Delete sync data after sync is complete
-		add_action( $this->get_sync_name() . '/complete', array( $this, 'delete_sync_data' ), 999 );
+		add_action( $this->get_sync_name() . '/complete', function() {
+			$this->cleanup_sync_data($this->get_sync_data_name());
+		}, 999 );
 	}
 
 	/**

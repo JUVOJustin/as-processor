@@ -75,13 +75,26 @@ abstract class Sync implements Syncable {
 		}
 
 		// Hooks for chunk cleanup
-		add_action(
-			'init',
-			function () {
+		add_action('init', function () {
 				$this->schedule_chunk_cleanup();
 			}
 		);
 		add_action( 'asp/chunks/cleanup', array( $this, 'cleanup_chunk_data' ) );
+
+		// Hook Sync Data Cleanup
+		add_action( 'init', function() {
+			if ( as_has_scheduled_action( 'asp/sync_data/cleanup' ) ) {
+				return;
+			}
+
+			// schedule the cleanup midnight every day
+			as_schedule_cron_action(
+				time(),
+				'0 * * * *',
+				'asp/sync_data/cleanup'
+			);
+		});
+		add_action( 'asp/chunks/cleanup', array( $this, 'cleanup_sync_data' ) );
 	}
 
 	/**
@@ -177,6 +190,7 @@ abstract class Sync implements Syncable {
 		// Check if action of the same group is running or pending
 		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
 		if ( count( $actions ) === 0 ) {
+			$this->cleanup_stale_locks();
 			as_enqueue_async_action(
 				$this->get_sync_name() . '/complete',
 				array(), // empty arguments array
