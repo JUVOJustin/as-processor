@@ -114,7 +114,7 @@ trait Sync_Data {
 				}
 
 				// Save the updated data back into the transient.
-				set_transient( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
+				$this->update_option( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
 
 				// Release lock
 				$this->set_key_lock( $key, false );
