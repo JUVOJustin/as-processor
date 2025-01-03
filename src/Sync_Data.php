@@ -121,7 +121,7 @@ trait Sync_Data {
 			} catch ( Sync_Data_Lock_Exception $e ) {
 				// Add random jitter to the delay (8% jitter in both directions)
 				$jitter = wp_rand( -80000, 80000 ) / 1000000; // Random jitter between -0.08s and +0.08s
-				$delay  = (int) ( $delay + $jitter );
+				$delay  = $delay + $jitter;
 
 				$this->log(
 					sprintf(
@@ -131,7 +131,7 @@ trait Sync_Data {
 						number_format( $delay, 2 )
 					)
 				);
-				usleep( $delay * 1000000 );
+				usleep( (int) $delay * 1000000 );
 
 				$total_wait_time += $delay;
 			}
