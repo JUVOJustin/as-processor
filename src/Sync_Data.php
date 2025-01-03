@@ -167,7 +167,7 @@ trait Sync_Data {
 
 		if ( $state ) {
 			// Try to acquire a lock using MySQL GET_LOCK
-			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, 2 ) );
+			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, 0.5 ) );
 
 			if ( ! $result ) {
 				throw new Sync_Data_Lock_Exception(
