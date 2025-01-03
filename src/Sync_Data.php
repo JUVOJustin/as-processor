@@ -167,9 +167,7 @@ trait Sync_Data {
 
 		if ( $state ) {
 			// Try to acquire a lock using MySQL GET_LOCK
-			// The timeout for acquiring the lock is set to 5 seconds (adjustable through filters)
-			$lock_timeout = apply_filters( 'asp/sync_data/lock_ttl', 5, $key );
-			$result       = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, $lock_timeout ) );
+			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, 2 ) );
 
 			if ( ! $result ) {
 				throw new Sync_Data_Lock_Exception(
@@ -195,7 +193,7 @@ trait Sync_Data {
 		$lock_content = $this->get_option( $lock_key );
 
 		// Check if another process owns the lock
-		if ( $lock_content && getmypid() !== $lock_content ) {
+		if ( $lock_content && $this->action_id !== $lock_content ) {
 			throw new Sync_Data_Lock_Exception(
 				esc_attr( sprintf( 'Failed to acquire option lock for %s', $lock_key ) )
 			);
@@ -205,7 +203,7 @@ trait Sync_Data {
 
 		// Set or clear the transient-based lock
 		if ( $state ) {
-			$this->update_option( $lock_key, getmypid(), $lock_ttl );
+			$this->update_option( $lock_key, $this->action_id, $lock_ttl );
 		} else {
 			$this->update_option( $lock_key, false, $lock_ttl );
 		}
@@ -259,7 +257,7 @@ trait Sync_Data {
 			wp_cache_delete( $key, 'options' );
 			$data = get_option( $key );
 		} else {
-			$data = wp_cache_get( $key, 'transient', true );
+			$data = wp_cache_get( $key, 'options', true );
 		}
 
 		if ( empty( $data['value'] ) || ( isset( $data['timestamp'] ) && $data['timestamp'] < time() ) ) {
