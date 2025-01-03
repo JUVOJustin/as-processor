@@ -20,8 +20,6 @@ use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
  */
 trait Sync_Data {
 
-
-
 	/**
 	 * Sync Data Name.
 	 * Each data key is stored in a separate transient with the scheme "$this->sync_data_name_$key".
@@ -121,11 +119,18 @@ trait Sync_Data {
 
 				return;
 			} catch ( Sync_Data_Lock_Exception $e ) {
-				$this->log( $e->getMessage() );
+				// Add random jitter to the delay (5% jitter in both directions)
+				$jitter = rand(-50000, 50000) / 1000000; // Random jitter between -0.05s and +0.05s
+				$delay = (int) ($delay + $jitter);
 
-				usleep( (int) ( $delay * 1000000 ) ); // Convert delay to microseconds
+				/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
+				$this->log( sprintf( esc_attr__( '%1$s Next try in %2$s seconds.', 'as-processor' ),
+					esc_attr( $e->getMessage() ),
+					number_format( $delay, 2 )
+				));
+				usleep($delay * 1000000);
+
 				$total_wait_time += $delay;
-				$delay           *= 2; // Double the delay
 			}
 		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $key, $total_wait_time ) ) );
 
