@@ -126,7 +126,7 @@ trait Sync_Data {
 				$this->log(
 					sprintf(
 					/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
-						esc_attr__( '%1$s Next try in %2$s seconds.', 'as-processor' ),
+						esc_attr__( '%1$s. Next try in %2$s seconds.', 'as-processor' ),
 						esc_attr( $e->getMessage() ),
 						number_format( $delay, 2 )
 					)
