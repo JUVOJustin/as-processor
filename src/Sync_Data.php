@@ -153,32 +153,34 @@ trait Sync_Data {
 	protected function set_key_lock( string $key, bool $state ): void {
 		$lock_key = $this->get_sync_data_name() . '_' . $key . '_lock';
 
+		// Fallback to using transient-based locking if database locks are not supported
+		if ( ! $this->supports_db_locks() ) {
+			$this->set_option_lock( $lock_key, $state );
+		}
+
 		// Use database-based locking for better reliability when available
-		if ( $this->supports_db_locks() ) {
-			global $wpdb;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		global $wpdb;
 
-			// Use a unique lock name (prefix it if needed)
-			$db_lock_key = $wpdb->esc_like( $lock_key );
+		// Use a unique lock name (prefix it if needed)
+		$db_lock_key = $wpdb->esc_like( $lock_key );
 
-			if ( $state ) {
-				// Try to acquire a lock using MySQL GET_LOCK
-				// The timeout for acquiring the lock is set to 5 seconds (adjustable through filters)
-				$lock_timeout = apply_filters( 'asp/sync_data/lock_ttl', 5, $key );
-				$result = $wpdb->get_var( $wpdb->prepare( "SELECT GET_LOCK(%s, %d)", $db_lock_key, $lock_timeout ) );
+		if ( $state ) {
+			// Try to acquire a lock using MySQL GET_LOCK
+			// The timeout for acquiring the lock is set to 5 seconds (adjustable through filters)
+			$lock_timeout = apply_filters( 'asp/sync_data/lock_ttl', 5, $key );
+			$result       = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, $lock_timeout ) );
 
-				if ( ! $result ) {
-					throw new Sync_Data_Lock_Exception(
-						esc_attr( sprintf( 'Failed to acquire database lock for %s', $lock_key ) )
-					);
-				}
-			} else {
-				// Release the lock using MySQL RELEASE_LOCK
-				$wpdb->query( $wpdb->prepare( "SELECT RELEASE_LOCK(%s)", $db_lock_key ) );
+			if ( ! $result ) {
+				throw new Sync_Data_Lock_Exception(
+					esc_attr( sprintf( 'Failed to acquire database lock for %s', $lock_key ) )
+				);
 			}
 		} else {
-			// Fallback to using transient-based locking if database locks are not supported
-			$this->set_transient_lock( $lock_key, $state );
+			// Release the lock using MySQL RELEASE_LOCK
+			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $db_lock_key ) );
 		}
+		// phpcs:enable
 	}
 
 	/**
@@ -189,13 +191,13 @@ trait Sync_Data {
 	 * @return void
 	 * @throws Sync_Data_Lock_Exception When the current lock is set by another process.
 	 */
-	protected function set_transient_lock( string $lock_key, bool $state ): void {
+	protected function set_option_lock( string $lock_key, bool $state ): void {
 		$lock_content = $this->get_option( $lock_key );
 
 		// Check if another process owns the lock
 		if ( $lock_content && getmypid() !== $lock_content ) {
 			throw new Sync_Data_Lock_Exception(
-				esc_attr( sprintf( 'Another process owns the lock for %s', $lock_key ) )
+				esc_attr( sprintf( 'Failed to acquire option lock for %s', $lock_key ) )
 			);
 		}
 
@@ -217,26 +219,18 @@ trait Sync_Data {
 	private function supports_db_locks(): bool {
 		global $wpdb;
 
-		// First, check if DB_HOST or other indicators confirm MySQL/MariaDB
-		if ( defined( 'DB_HOST' ) ) {
-			$db_host = strtolower( constant( 'DB_HOST' ) );
-			if ( strpos( $db_host, 'mysql' ) !== false ) {
-				return true;
-			}
-		}
-
-		// Use the $wpdb driver type as a secondary check (MySQL only)
-		if ( $wpdb->use_mysqli ) {
-			return true;
+		// Temporary - This will be in wp-config.php once SQLite is merged in Core.
+		if ( defined( 'DB_ENGINE' ) && 'mysql' !== DB_ENGINE ) {
+			return false;
 		}
 
 		// Optionally check db_version (MariaDB versions begin with '10')
 		$db_version = $wpdb->db_version();
-		if ( strpos( strtolower( $db_version ), 'mariadb' ) !== false || version_compare( $db_version, '5.7', '>=' ) ) {
+		if ( str_contains( strtolower( $db_version ), 'mariadb' ) || version_compare( $db_version, '5.7', '>=' ) ) {
 			return true; // MariaDB or MySQL version 5.7+ supports GET_LOCK
 		}
 
-		// Assume unfamiliar systems (e.g., SQLite, etc.) don't support DB locks
+		// Assume unfamiliar systems don't support DB locks
 		return false;
 	}
 
