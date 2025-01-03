@@ -120,15 +120,18 @@ trait Sync_Data {
 				return;
 			} catch ( Sync_Data_Lock_Exception $e ) {
 				// Add random jitter to the delay (8% jitter in both directions)
-				$jitter = rand(-80000, 80000) / 1000000; // Random jitter between -0.08s and +0.08s
-				$delay = (int) ($delay + $jitter);
+				$jitter = wp_rand( -80000, 80000 ) / 1000000; // Random jitter between -0.08s and +0.08s
+				$delay  = (int) ( $delay + $jitter );
 
-				/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
-				$this->log( sprintf( esc_attr__( '%1$s Next try in %2$s seconds.', 'as-processor' ),
-					esc_attr( $e->getMessage() ),
-					number_format( $delay, 2 )
-				));
-				usleep($delay * 1000000);
+				$this->log(
+					sprintf(
+					/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
+						esc_attr__( '%1$s Next try in %2$s seconds.', 'as-processor' ),
+						esc_attr( $e->getMessage() ),
+						number_format( $delay, 2 )
+					)
+				);
+				usleep( $delay * 1000000 );
 
 				$total_wait_time += $delay;
 			}
@@ -179,7 +182,7 @@ trait Sync_Data {
 	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
 	 */
 	private function get_option( string $key ) {
-		if (!str_contains($key, 'asp_')) {
+		if ( ! str_contains( $key, 'asp_' ) ) {
 			$key = 'asp_' . $key;
 		}
 
@@ -208,7 +211,7 @@ trait Sync_Data {
 	 * @return bool True if the option value was successfully updated, false otherwise.
 	 */
 	protected function update_option( string $key, mixed $value, int $timestamp ): bool {
-		if (!str_contains($key, 'asp_')) {
+		if ( ! str_contains( $key, 'asp_' ) ) {
 			$key = 'asp_' . $key;
 		}
 
@@ -254,7 +257,7 @@ trait Sync_Data {
 				delete_option( $option_name );
 			}
 
-			if(!$this->get_option( $option_name )) {
+			if ( ! $this->get_option( $option_name ) ) {
 				delete_option( $option_name );
 			}
 		}
