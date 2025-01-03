@@ -119,8 +119,8 @@ trait Sync_Data {
 
 				return;
 			} catch ( Sync_Data_Lock_Exception $e ) {
-				// Add random jitter to the delay (5% jitter in both directions)
-				$jitter = rand(-50000, 50000) / 1000000; // Random jitter between -0.05s and +0.05s
+				// Add random jitter to the delay (8% jitter in both directions)
+				$jitter = rand(-80000, 80000) / 1000000; // Random jitter between -0.08s and +0.08s
 				$delay = (int) ($delay + $jitter);
 
 				/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
