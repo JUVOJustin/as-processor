@@ -131,9 +131,10 @@ trait Sync_Data {
 						number_format( $delay, 2 )
 					)
 				);
-				usleep( (int) $delay * 1000000 );
+				usleep( (int) ( $delay * 1000000 ) );
 
 				$total_wait_time += $delay;
+				$delay            = $delay * 1.4;
 			}
 		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $key, $total_wait_time ) ) );
 
@@ -142,7 +143,7 @@ trait Sync_Data {
 	}
 
 	/**
-	 * Set a lock state for a specific key with an optional expiration (TTL).
+	 * Set a lock state for a specific key using MySQL GET_LOCK if available, or fallback to the current method.
 	 *
 	 * @param string $key The key for which the lock state is being set.
 	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
@@ -150,21 +151,93 @@ trait Sync_Data {
 	 * @throws Sync_Data_Lock_Exception When the current lock is set by another process.
 	 */
 	protected function set_key_lock( string $key, bool $state ): void {
-		$lock_key     = $this->get_sync_data_name() . '_' . $key . '_lock';
+		$lock_key = $this->get_sync_data_name() . '_' . $key . '_lock';
+
+		// Use database-based locking for better reliability when available
+		if ( $this->supports_db_locks() ) {
+			global $wpdb;
+
+			// Use a unique lock name (prefix it if needed)
+			$db_lock_key = $wpdb->esc_like( $lock_key );
+
+			if ( $state ) {
+				// Try to acquire a lock using MySQL GET_LOCK
+				// The timeout for acquiring the lock is set to 5 seconds (adjustable through filters)
+				$lock_timeout = apply_filters( 'asp/sync_data/lock_ttl', 5, $key );
+				$result = $wpdb->get_var( $wpdb->prepare( "SELECT GET_LOCK(%s, %d)", $db_lock_key, $lock_timeout ) );
+
+				if ( ! $result ) {
+					throw new Sync_Data_Lock_Exception(
+						esc_attr( sprintf( 'Failed to acquire database lock for %s', $lock_key ) )
+					);
+				}
+			} else {
+				// Release the lock using MySQL RELEASE_LOCK
+				$wpdb->query( $wpdb->prepare( "SELECT RELEASE_LOCK(%s)", $db_lock_key ) );
+			}
+		} else {
+			// Fallback to using transient-based locking if database locks are not supported
+			$this->set_transient_lock( $lock_key, $state );
+		}
+	}
+
+	/**
+	 * Fallback mechanism to set a transient-based lock.
+	 *
+	 * @param string $lock_key The key for which the lock state is being set.
+	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
+	 * @return void
+	 * @throws Sync_Data_Lock_Exception When the current lock is set by another process.
+	 */
+	protected function set_transient_lock( string $lock_key, bool $state ): void {
 		$lock_content = $this->get_option( $lock_key );
 
+		// Check if another process owns the lock
 		if ( $lock_content && getmypid() !== $lock_content ) {
-			throw new Sync_Data_Lock_Exception( esc_attr( sprintf( 'Another process owns the lock for %s', $lock_key ) ) );
+			throw new Sync_Data_Lock_Exception(
+				esc_attr( sprintf( 'Another process owns the lock for %s', $lock_key ) )
+			);
 		}
 
-		$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key );
+		$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $lock_key );
 
+		// Set or clear the transient-based lock
 		if ( $state ) {
-			// Setting the lock with the pid
 			$this->update_option( $lock_key, getmypid(), $lock_ttl );
 		} else {
 			$this->update_option( $lock_key, false, $lock_ttl );
 		}
+	}
+
+	/**
+	 * Check if the current database system supports native MySQL/MariaDB locks.
+	 *
+	 * @return bool True if the system supports MySQL/MariaDB-level locks, false otherwise.
+	 */
+	private function supports_db_locks(): bool {
+		global $wpdb;
+
+		// First, check if DB_HOST or other indicators confirm MySQL/MariaDB
+		if ( defined( 'DB_HOST' ) ) {
+			$db_host = strtolower( constant( 'DB_HOST' ) );
+			if ( strpos( $db_host, 'mysql' ) !== false ) {
+				return true;
+			}
+		}
+
+		// Use the $wpdb driver type as a secondary check (MySQL only)
+		if ( $wpdb->use_mysqli ) {
+			return true;
+		}
+
+		// Optionally check db_version (MariaDB versions begin with '10')
+		$db_version = $wpdb->db_version();
+		if ( strpos( strtolower( $db_version ), 'mariadb' ) !== false || version_compare( $db_version, '5.7', '>=' ) ) {
+			return true; // MariaDB or MySQL version 5.7+ supports GET_LOCK
+		}
+
+		// Assume unfamiliar systems (e.g., SQLite, etc.) don't support DB locks
+		return false;
 	}
 
 	/**
