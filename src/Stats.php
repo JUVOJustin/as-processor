@@ -3,12 +3,12 @@
 namespace juvo\AS_Processor;
 
 use DateTimeImmutable;
+use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
 
 class Stats
 {
-    use DB;
 
     /**
      * The group name for the sync process.
@@ -33,14 +33,14 @@ class Stats
      * @return float|string|false Duration or false if not available.
      */
     public function get_sync_duration(bool $human_time = false): float|string|false {
-        $query = $this->db()->prepare(
+        $query = Chunk_DB::db()->prepare(
             "SELECT MIN(start) as sync_start, MAX(end) as sync_end 
-            FROM {$this->get_chunks_table_name()} 
+            FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s",
             $this->group_name
         );
 
-        $result = $this->db()->get_row($query);
+        $result = Chunk_DB::db()->get_row($query);
 
         if (empty($result->sync_start) || empty($result->sync_end)) {
             return false;
@@ -61,13 +61,13 @@ class Stats
      * @return int
      */
     public function get_total_actions(): int {
-        $query = $this->db()->prepare(
-            "SELECT COUNT(*) FROM {$this->get_chunks_table_name()} 
+        $query = Chunk_DB::db()->prepare(
+            "SELECT COUNT(*) FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s",
             $this->group_name
         );
 
-        return (int)$this->db()->get_var($query);
+        return (int)Chunk_DB::db()->get_var($query);
     }
 
     /**
@@ -84,13 +84,13 @@ class Stats
         $status_values = array_map(static fn(ProcessStatus $status): string => $status->value, $statuses);
 
         $placeholders = array_fill(0, count($status_values), '%s');
-        $query = $this->db()->prepare(
-            "SELECT * FROM {$this->get_chunks_table_name()} 
+        $query = Chunk_DB::db()->prepare(
+            "SELECT * FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s AND status IN (" . implode(',', $placeholders) . ")",
             array_merge([$this->group_name], $status_values)
         );
 
-        $results = $this->db()->get_results($query, ARRAY_A);
+        $results = Chunk_DB::db()->get_results($query, ARRAY_A);
 
         if ($include_durations) {
             foreach ($results as &$action) {
@@ -113,14 +113,14 @@ class Stats
      * @return float|string
      */
     public function get_average_action_duration(bool $human_time = false): float|string {
-        $query = $this->db()->prepare(
+        $query = Chunk_DB::db()->prepare(
             "SELECT AVG(end - start) as avg_duration 
-            FROM {$this->get_chunks_table_name()} 
+            FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL",
             $this->group_name
         );
 
-        $average = (float)$this->db()->get_var($query);
+        $average = (float)Chunk_DB::db()->get_var($query);
 
         return $human_time ?
             Helper::human_time_diff_microseconds(0, $average) :
@@ -134,16 +134,16 @@ class Stats
      * @return array|null
      */
     public function get_slowest_action(bool $human_time = false): ?array {
-        $query = $this->db()->prepare(
+        $query = Chunk_DB::db()->prepare(
             "SELECT *, (end - start) as duration 
-            FROM {$this->get_chunks_table_name()} 
+            FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
             ORDER BY duration DESC 
             LIMIT 1",
             $this->group_name
         );
 
-        $result = $this->db()->get_row($query, ARRAY_A);
+        $result = Chunk_DB::db()->get_row($query, ARRAY_A);
 
         if (!$result) {
             return null;
@@ -166,16 +166,16 @@ class Stats
      * @return array|null
      */
     public function get_fastest_action(bool $human_time = false): ?array {
-        $query = $this->db()->prepare(
+        $query = Chunk_DB::db()->prepare(
             "SELECT *, (end - start) as duration 
-            FROM {$this->get_chunks_table_name()} 
+            FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
             ORDER BY duration ASC 
             LIMIT 1",
             $this->group_name
         );
 
-        $result = $this->db()->get_row($query, ARRAY_A);
+        $result = Chunk_DB::db()->get_row($query, ARRAY_A);
 
         if (!$result) {
             return null;
@@ -198,9 +198,9 @@ class Stats
      */
     public function get_sync_start(): ?DateTimeImmutable
     {
-        $query = $this->db()->prepare(
+        $query = Chunk_DB::db()->prepare(
             "SELECT start
-            FROM {$this->get_chunks_table_name()}
+            FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s
             AND start IS NOT NULL
             ORDER BY start ASC
@@ -208,7 +208,7 @@ class Stats
             $this->group_name
         );
         
-        $start = $this->db()->get_var($query);
+        $start = Chunk_DB::db()->get_var($query);
         
         if (empty($start)) {
             return null;
@@ -224,9 +224,9 @@ class Stats
      */
     public function get_sync_end(): ?DateTimeImmutable
     {
-        $query = $this->db()->prepare(
+        $query = Chunk_DB::db()->prepare(
             "SELECT end
-            FROM {$this->get_chunks_table_name()}
+            FROM ". Chunk_DB::db()->get_table_name() ."
             WHERE `group` = %s
             AND end IS NOT NULL
             ORDER BY end DESC
@@ -234,7 +234,7 @@ class Stats
             $this->group_name
         );
         
-        $end = $this->db()->get_var($query);
+        $end = Chunk_DB::db()->get_var($query);
         
         if (empty($end)) {
             return null;
@@ -255,14 +255,14 @@ class Stats
      */
     public function get_actions(): array
     {
-        $query = $this->db()->prepare(
+        $query = Chunk_DB::db()->prepare(
             "SELECT `id`, `name`, `group`, `status` 
-            FROM {$this->get_chunks_table_name()} 
+            FROM ". Chunk_DB::db()->get_table_name() ." 
             WHERE `group` = %s",
             $this->group_name
         );
 
-        $results = $this->db()->get_results($query, ARRAY_A);
+        $results = Chunk_DB::db()->get_results($query, ARRAY_A);
 
         if (!is_array($results)) {
             return [];
@@ -304,7 +304,6 @@ class Stats
     }
 
     /**
-     * /**
      * Prepare an email text report, including custom data.
      *
      * @param array $custom_data Optional custom data to be included

@@ -32,33 +32,13 @@ trait Sync_Data {
 	private string $sync_data_name;
 
 	/**
-	 * Instance of the database handler
-	 *
-	 * @var ?Data_DB
-	 */
-	private ?Data_DB $data_db = null;
-
-	/**
-	 * Get the Data_DB instance.
-	 *
-	 * @return Data_DB
-	 */
-	private function get_data_db(): Data_DB {
-		if ( is_null( $this->data_db ) ) {
-			$this->data_db = new Data_DB();
-			$this->data_db->ensure_table();
-		}
-		return $this->data_db;
-	}
-
-	/**
 	 * Returns the sync data from a transient
 	 *
 	 * @param string $key Key of the sync data to retrieve.
 	 * @return mixed
 	 */
 	protected function get_sync_data( string $key ): mixed {
-		return $this->get_data_db()->get( $this->get_sync_data_name() . '_' . $key )['data'];
+		return Data_DB::db()->get( $this->get_sync_data_name() . '_' . $key, 'data' );
 	}
 
 	/**
@@ -121,7 +101,7 @@ trait Sync_Data {
 			}
 		}
 
-		$success = $this->get_data_db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
+		$success = Data_DB::db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
 		if ( ! $success ) {
 			throw new Exception(
 			/* translators: 1: The key name of the sync data trying to update. */
@@ -188,7 +168,7 @@ trait Sync_Data {
 
 		do {
 			try {
-				$lock_content = (int) $this->get_data_db()->get( $lock_key, 'data' );
+				$lock_content = (int) Data_DB::db()->get( $lock_key, 'data' );
 
 				// Check if another process owns the lock
 				if ( $lock_content && $this->action_id !== $lock_content ) {
@@ -201,9 +181,9 @@ trait Sync_Data {
 
 				// Set or clear the transient-based lock
 				if ( $state ) {
-					$this->get_data_db()->replace( $lock_key, $this->action_id, $lock_ttl );
+					Data_DB::db()->replace( $lock_key, $this->action_id, $lock_ttl );
 				} else {
-					$this->get_data_db()->replace( $lock_key, false, $lock_ttl );
+					Data_DB::db()->replace( $lock_key, false, $lock_ttl );
 				}
 				return;
 			} catch ( Sync_Data_Lock_Exception $e ) {
@@ -262,6 +242,6 @@ trait Sync_Data {
 	 * @return void
 	 */
 	public function cleanup_sync_data(): void {
-		$this->get_data_db()->delete_expired_data();
+		Data_DB::db()->delete_expired_data();
 	}
 }
