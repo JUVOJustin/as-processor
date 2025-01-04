@@ -9,7 +9,7 @@ namespace juvo\AS_Processor;
 
 use Exception;
 use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
-use \juvo\AS_Processor\DB\Data_DB;
+use juvo\AS_Processor\DB\Data_DB;
 
 /**
  * Trait Sync_Data
@@ -21,6 +21,7 @@ use \juvo\AS_Processor\DB\Data_DB;
  */
 trait Sync_Data {
 
+
 	/**
 	 * Sync Data Name.
 	 * Each data key is stored in a separate transient with the scheme "$this->sync_data_name_$key".
@@ -31,7 +32,9 @@ trait Sync_Data {
 	private string $sync_data_name;
 
 	/**
-	 * @var ?Data_DB Instance of the database handler
+	 * Instance of the database handler
+	 *
+	 * @var ?Data_DB
 	 */
 	private ?Data_DB $data_db = null;
 
@@ -99,58 +102,35 @@ trait Sync_Data {
 	 */
 	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
-		$delay           = 0.1; // Initial delay in seconds
-		$total_wait_time = 0;
+			// Set lock
+			$this->set_key_lock( $key, true );
 
-		do {
-			try {
-				// Set lock
-				$this->set_key_lock( $key, true );
+			// Handle merging logic
+		if ( $deep_merge || $concat_arrays ) {
 
-				// Handle merging logic
-				if ( $deep_merge || $concat_arrays ) {
+			// Retrieve the current data.
+			$current_data = $this->get_sync_data( $key );
 
-					// Retrieve the current data.
-					$current_data = $this->get_sync_data( $key );
-
-					// If current data not initialized yet make it an array
-					if ( ! $current_data ) {
-						$current_data = array();
-					}
-
-					if ( is_array( $current_data ) && is_array( $updates ) ) {
-						$updates = Helper::merge_arrays( $current_data, $updates, $deep_merge, $concat_arrays );
-					}
-				}
-
-				$this->get_data_db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
-
-				// Release lock
-				$this->set_key_lock( $key, false );
-
-				return;
-			} catch ( Sync_Data_Lock_Exception $e ) {
-				// Add random jitter to the delay (8% jitter in both directions)
-				$jitter = wp_rand( -80000, 80000 ) / 1000000; // Random jitter between -0.08s and +0.08s
-				$delay  = $delay + $jitter;
-
-				$this->log(
-					sprintf(
-					/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
-						esc_attr__( '%1$s. Next try in %2$s seconds.', 'as-processor' ),
-						esc_attr( $e->getMessage() ),
-						number_format( $delay, 2 )
-					)
-				);
-				usleep( (int) ( $delay * 1000000 ) );
-
-				$total_wait_time += $delay;
-				$delay            = $delay * 1.4;
+			// If current data not initialized yet make it an array
+			if ( ! $current_data ) {
+				$current_data = array();
 			}
-		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $key, $total_wait_time ) ) );
 
-		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
-		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data "%1$s". Tried %2$s seconds.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
+			if ( is_array( $current_data ) && is_array( $updates ) ) {
+				$updates = Helper::merge_arrays( $current_data, $updates, $deep_merge, $concat_arrays );
+			}
+		}
+
+			$success = $this->get_data_db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
+		if ( ! $success ) {
+			throw new Exception(
+			/* translators: 1: The key name of the sync data trying to update. */
+				sprintf( esc_attr__( 'Failed to update sync data for key %s', 'as-processor' ), esc_attr( $key ) )
+			);
+		}
+
+			// Release lock
+			$this->set_key_lock( $key, false );
 	}
 
 	/**
@@ -178,11 +158,12 @@ trait Sync_Data {
 
 		if ( $state ) {
 			// Try to acquire a lock using MySQL GET_LOCK
-			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, 0.5 ) );
+			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, apply_filters( 'asp/sync_data/max_wait_time', 5, $key ) ) );
 
 			if ( ! $result ) {
 				throw new Sync_Data_Lock_Exception(
-					esc_attr( sprintf( 'Failed to acquire database lock for %s', $lock_key ) )
+				/* translators: 1: The name of the key for which is database lock is acquired. */
+					sprintf( esc_attr__( 'Failed to acquire database lock for %s', 'as-processor' ), esc_attr( $lock_key ) )
 				);
 			}
 		} else {
@@ -198,26 +179,54 @@ trait Sync_Data {
 	 * @param string $lock_key The key for which the lock state is being set.
 	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
 	 * @return void
-	 * @throws Sync_Data_Lock_Exception When the current lock is set by another process.
+	 * @throws Sync_Data_Lock_Exception When the lock could not be acquired.
 	 */
 	protected function set_option_lock( string $lock_key, bool $state ): void {
-		$lock_content = $this->get_data_db()->get( $lock_key );
 
-		// Check if another process owns the lock
-		if ( $lock_content && $this->action_id !== $lock_content ) {
-			throw new Sync_Data_Lock_Exception(
-				esc_attr( sprintf( 'Failed to acquire option lock for %s', $lock_key ) )
-			);
-		}
+		$delay           = 0.1;
+		$total_wait_time = 0;
 
-		$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $lock_key );
+		do {
+			try {
+				$lock_content = (int) $this->get_data_db()->get( $lock_key, 'data' );
 
-		// Set or clear the transient-based lock
-		if ( $state ) {
-			$this->get_data_db()->replace( $lock_key, $this->action_id, $lock_ttl );
-		} else {
-			$this->get_data_db()->replace( $lock_key, false, $lock_ttl );
-		}
+				// Check if another process owns the lock
+				if ( $lock_content && $this->action_id !== $lock_content ) {
+					throw new Sync_Data_Lock_Exception(
+						esc_attr( sprintf( 'Failed to acquire option lock for %s', $lock_key ) )
+					);
+				}
+
+				$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $lock_key );
+
+				// Set or clear the transient-based lock
+				if ( $state ) {
+					$this->get_data_db()->replace( $lock_key, $this->action_id, $lock_ttl );
+				} else {
+					$this->get_data_db()->replace( $lock_key, false, $lock_ttl );
+				}
+			} catch ( Sync_Data_Lock_Exception $e ) {
+				// Add random jitter to the delay (8% jitter in both directions)
+				$jitter = wp_rand( -80000, 80000 ) / 1000000; // Random jitter between -0.08s and +0.08s
+				$delay  = $delay + $jitter;
+
+				$this->log(
+					sprintf(
+						/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
+						esc_attr__( '%1$s. Next try in %2$s seconds.', 'as-processor' ),
+						esc_attr( $e->getMessage() ),
+						number_format( $delay, 2 )
+					)
+				);
+				usleep( (int) ( $delay * 1000000 ) );
+
+				$total_wait_time += $delay;
+				$delay            = $delay * 1.4;
+			}
+		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $lock_key, $total_wait_time ) ) );
+
+		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
+		throw new Sync_Data_Lock_Exception( sprintf( esc_attr__( 'Failed to acquire option lock for "%1$s". Tried %2$s seconds.', 'as-processor' ), esc_attr( $lock_key ), number_format( $total_wait_time, 2 ) ) );
 	}
 
 	/**
@@ -249,15 +258,9 @@ trait Sync_Data {
 	 * This method removes or processes options from the database that are associated with a specific synchronization prefix or group.
 	 * It either deletes matching groups or tries to get the value what automatically checks if the time limit is reached and deletes the option when needed.
 	 *
-	 * @param string $force_delete_group Optional. A group identifier to forcefully delete matching options. Defaults to an empty string.
 	 * @return void
 	 */
-	public function cleanup_sync_data( string $force_delete_group = '' ): void {
-		$table_name = $this->get_data_db()->get_table_name();
-
-		global $wpdb;
-		$wpdb->query(
-			$wpdb->prepare( "DELETE FROM {$table_name} WHERE expires < %s", current_time( 'mysql' ) )
-		);
+	public function cleanup_sync_data(): void {
+		$this->get_data_db()->delete_expired_data();
 	}
 }

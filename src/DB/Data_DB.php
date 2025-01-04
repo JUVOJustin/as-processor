@@ -7,9 +7,20 @@
 
 namespace juvo\AS_Processor\DB;
 
+/**
+ * Class Data_DB
+ *
+ * This class provides an interface for interacting with a database table that stores data entries.
+ * It supports operations such as table creation, data insertion, retrieval, deletion, and expiration management.
+ */
 class Data_DB extends Base_DB {
 
 
+	/**
+	 * The name of the table.
+	 *
+	 * @var string
+	 */
 	protected string $table_name = 'asp_data';
 
 	/**
@@ -81,9 +92,11 @@ class Data_DB extends Base_DB {
 	 * Retrieve data from the database by name.
 	 *
 	 * @param string $name The name of the data to retrieve.
-	 * @return array|false The full row if available and not expired, or false if not found or expired.
+	 * @param string $column Optional. A specific column to return from the data row. Defaults to an empty string.
+	 *
+	 * @return array|false The data row as an associative array, a specific column's value if specified, or false if not found or expired.
 	 */
-	public function get( string $name ): array|false {
+	public function get( string $name, string $column = '' ): array|false {
 		// Try to get the data from the database
 		$row = $this->db->get_row(
 			$this->db->prepare(
@@ -105,6 +118,14 @@ class Data_DB extends Base_DB {
 
 		// Unserialize the data before returning
 		$row['data'] = maybe_unserialize( $row['data'] );
+
+		// Maybe only return the one key
+		if ( $column ) {
+			if ( ! empty( $row[ $column ] ) ) {
+				return $row[ $column ];
+			}
+			return false;
+		}
 
 		return $row;
 	}

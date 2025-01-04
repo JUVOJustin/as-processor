@@ -30,4 +30,13 @@
     <exclude-pattern>*.ts</exclude-pattern>
     <exclude-pattern>*.tsx</exclude-pattern>
 
+    <!-- Additional configuration to ignore specific rules in src/DB -->
+    <rule ref="WordPress.DB.DirectDatabaseQuery.NoCaching">
+        <exclude-pattern>src/DB/*</exclude-pattern>
+    </rule>
+
+    <rule ref="WordPress.DB.DirectDatabaseQuery.DirectQuery">
+        <exclude-pattern>src/DB/*</exclude-pattern>
+    </rule>
+
 </ruleset>

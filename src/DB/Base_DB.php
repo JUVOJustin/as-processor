@@ -1,9 +1,19 @@
 <?php
+/**
+ * Base layer for custom DB tables.
+ *
+ * @package juvo/as-processor
+ */
 
 namespace juvo\AS_Processor\DB;
 
 use wpdb;
 
+/**
+ * Abstract class Base_DB.
+ * Serves as a base for database-related functionality,
+ * providing a structure for interacting with custom database tables.
+ */
 abstract class Base_DB {
 
 	/**
