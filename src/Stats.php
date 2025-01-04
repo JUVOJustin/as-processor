@@ -130,10 +130,10 @@ class Stats
     /**
      * Gets the slowest action.
      *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return array|null
-     */
-    public function get_slowest_action(bool $human_time = false): ?array {
+     * @return ?Chunk
+	 */
+    public function get_slowest_action(): ?Chunk
+	{
         $query = Chunk_DB::db()->prepare(
             "SELECT *, (end - start) as duration 
             FROM ". Chunk_DB::db()->get_table_name() ."
@@ -142,30 +142,22 @@ class Stats
             LIMIT 1",
             $this->group_name
         );
+		$chunk = Chunk_DB::db()->get_chunk($query);
 
-        $result = Chunk_DB::db()->get_row($query, ARRAY_A);
+		if (!$chunk) {
+			return null;
+		}
 
-        if (!$result) {
-            return null;
-        }
-
-        $duration = round((float)$result['end'] - (float)$result['start'], 4);
-
-        return [
-            'id' => $result['id'],
-            'duration' => $human_time ?
-                Helper::human_time_diff_microseconds(0, $duration) :
-                $duration
-        ];
+		return $chunk;
     }
 
     /**
      * Gets the fastest action.
      *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return array|null
-     */
-    public function get_fastest_action(bool $human_time = false): ?array {
+     * @return ?Chunk
+	 */
+    public function get_fastest_action(): ?Chunk
+	{
         $query = Chunk_DB::db()->prepare(
             "SELECT *, (end - start) as duration 
             FROM ". Chunk_DB::db()->get_table_name() ."
@@ -174,21 +166,13 @@ class Stats
             LIMIT 1",
             $this->group_name
         );
+        $chunk = Chunk_DB::db()->get_chunk($query);
 
-        $result = Chunk_DB::db()->get_row($query, ARRAY_A);
-
-        if (!$result) {
+        if (!$chunk) {
             return null;
         }
 
-        $duration = round((float)$result['end'] - (float)$result['start'], 4);
-
-        return [
-            'id' => $result['id'],
-            'duration' => $human_time ?
-                Helper::human_time_diff_microseconds(0, $duration) :
-                $duration
-        ];
+        return $chunk;
     }
 
     /**
@@ -317,8 +301,8 @@ class Stats
         $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), $this->get_total_actions()) . "\n";
         $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), $this->get_sync_duration(true)) . "\n";
         $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), $this->get_average_action_duration(true)) . "\n";
-        $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), $this->get_slowest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
-        $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), $this->get_fastest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
+        $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, $this->get_slowest_action()?->get_duration()) ) . "\n";
+        $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, $this->get_fastest_action()?->get_duration()) ) . "\n";
 
 		// Append custom data if available
 		if (!empty($custom_data)) {
@@ -329,16 +313,16 @@ class Stats
 		}
 
         // Failed actions
-        $failed_actions = $this->get_actions_by_status(ProcessStatus::FAILED);
-        if (!empty($failed_actions)) {
+		$failed_actions = Chunk_DB::db()->get_chunks_by_status(ProcessStatus::FAILED, $this->group_name);
+		if (!empty($failed_actions)) {
             $email_text .= "\n-- " . __("Failed Actions Detail:", 'as-processor') . " --\n";
-            foreach ($failed_actions as $action) {
-                $chunk = new Chunk( $action['id'] );
+            foreach ($failed_actions as $chunk) {
                 $email_text .= sprintf(__("Action ID: %s", 'as-processor'), $chunk->get_action_id()) . "\n";
                 $email_text .= sprintf(__("Status: %s", 'as-processor'), $chunk->get_status()->value) . "\n";
                 $email_text .= sprintf(__("Start: %s", 'as-processor'), $chunk->get_start()->format('Y-m-d H:i:s')) . "\n";
                 $email_text .= sprintf(__("End: %s", 'as-processor'), $chunk->get_end()->format('Y-m-d H:i:s')) . "\n";
-                if ($action['status'] === 'failed') {
+
+				if ($chunk->get_status()->value === 'failed') {
                     $email_text .= __("Log Messages:", 'as-processor') . "\n";
                     foreach ( $chunk->get_logs() as $message ) {
 						$decoded_message = htmlspecialchars_decode($message, ENT_QUOTES);

@@ -10,6 +10,8 @@ namespace juvo\AS_Processor\Entities;
 use Exception;
 use DateTimeImmutable;
 use juvo\AS_Processor\DB;
+use juvo\AS_Processor\DB\Chunk_DB;
+use juvo\AS_Processor\Helper;
 
 /**
  * The chunk entity class
@@ -99,10 +101,8 @@ class Chunk {
 			return;
 		}
 
-		DB\Chunk_DB::db()->fetch( $this );
-
-		// Fetch associated logs
-		$this->logs = DB\Chunk_DB::db()->get_logs( $this->action_id );
+		$row = Chunk_DB::db()->get_row_by_id( $this->chunk_id );
+		self::from_array( $row, $this );
 
 		$this->is_data_fetched = true;
 	}
@@ -284,7 +284,7 @@ class Chunk {
 	/**
 	 * Sets the end date and time.
 	 *
-	 * @param DateTimeImmutable $date The end date and time.
+	 * @param ?DateTimeImmutable $date The end date and time.
 	 * @return void
 	 */
 	public function set_end( ?DateTimeImmutable $date = null ): void {
@@ -294,6 +294,16 @@ class Chunk {
 		}
 
 		$this->end = $date;
+	}
+
+	/**
+	 * Sets the logs.
+	 *
+	 * @param array $logs An array of log data.
+	 * @return void
+	 */
+	private function set_logs( array $logs ): void {
+		$this->logs = $logs;
 	}
 
 	/**
@@ -354,5 +364,36 @@ class Chunk {
 		}
 
 		return $data;
+	}
+
+	public static function from_array( array $data, ?Chunk $chunk = null ): Chunk {
+
+		if ( empty( $chunk ) ) {
+			$chunk = new Chunk( $data['id'] ?? null );
+		}
+
+		// Check for each value before calling the corresponding setter
+		if ( ! empty( $data['data'] ) ) {
+			$chunk->set_data( unserialize( $data['data'] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
+		}
+
+		if ( ! empty( $data['action_id'] ) ) {
+			$chunk->set_action_id( (int) $data['action_id'] );
+			$chunk->set_logs( Chunk_DB::db()->get_logs( $data['action_id'] ) );
+		}
+
+		if ( ! empty( $data['status'] ) ) {
+			$chunk->set_status( ProcessStatus::from( $data['status'] ) );
+		}
+
+		if ( ! empty( $data['start'] ) ) {
+			$chunk->set_start( Helper::convert_microtime_to_datetime( $data['start'] ) );
+		}
+
+		if ( ! empty( $data['end'] ) ) {
+			$chunk->set_end( Helper::convert_microtime_to_datetime( $data['end'] ) );
+		}
+
+		return $chunk;
 	}
 }

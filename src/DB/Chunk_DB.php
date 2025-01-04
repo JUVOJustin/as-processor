@@ -57,29 +57,70 @@ class Chunk_DB extends Base_DB {
 	}
 
 	/**
-	 * Fetches data for a given chunk and populates its properties.
+	 * Retrieve a row from the database by its ID.
 	 *
-	 * @param Chunk $chunk The chunk object for which data is to be fetched.
-	 *
-	 * @return void
+	 * @param int $id The ID of the row to retrieve.
+	 * @return bool|array Returns an array representing the row if found, or false if the row does not exist.
 	 */
-	public function fetch( Chunk $chunk ): void {
-
-		$data_query = $this->db->prepare(
-			"SELECT * FROM {$this->get_table_name()} WHERE id = %d",
-			$chunk->get_chunk_id()
+	public function get_row_by_id( int $id ): bool|array {
+		$row = $this->db->get_row(
+			$this->db->prepare(
+				"SELECT * FROM {$this->get_table_name()} WHERE id = %d",
+				$id
+			),
+			ARRAY_A
 		);
-		$row        = $this->db->get_row( $data_query, ARRAY_A );
+		return $row ?: false;
+	}
+
+	/**
+	 * Retrieves one row from the database
+	 *
+	 * @param string $query
+	 * @return bool|Chunk
+	 */
+	public function get_chunk( string $query ): bool|Chunk {
+
+		$row = $this->db->get_row( $query, ARRAY_A );
 
 		if ( ! $row ) {
-			return; // No data found
+			return false; // No data found
 		}
 
-		$chunk->set_data( unserialize( $row['data'] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
-		$chunk->set_action_id( intval( $row['action_id'] ) );
-		$chunk->set_status( ProcessStatus::from( $row['status'] ) );
-		$chunk->set_start( Helper::convert_microtime_to_datetime( $row['start'] ) );
-		$chunk->set_end( Helper::convert_microtime_to_datetime( $row['end'] ) );
+		return Chunk::from_array( $row );
+	}
+
+	/**
+	 * Gets actions filtered by status.
+	 *
+	 * @param ProcessStatus|array<ProcessStatus> $status Status to filter by.
+	 * @param string                             $group_name
+	 * @return Chunk[]
+	 */
+	public function get_chunks_by_status( ProcessStatus|array $status, string $group_name ): array {
+		$statuses      = is_array( $status ) ? $status : array( $status );
+		$status_values = array_map( static fn( ProcessStatus $status ): string => $status->value, $statuses );
+
+		$placeholders = array_fill( 0, count( $status_values ), '%s' );
+		$query        = $this->db->prepare(
+			'SELECT * FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s AND status IN (' . implode( ',', $placeholders ) . ')',
+			array_merge( array( $group_name ), $status_values )
+		);
+
+		$results = self::db()->get_results( $query, ARRAY_A );
+		if ( empty( $results ) ) {
+			return array();
+		}
+
+		$results = array_map(
+			function ( $row ) {
+				return Chunk::from_array( $row );
+			},
+			$results
+		);
+
+		return $results;
 	}
 
 	/**
