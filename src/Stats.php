@@ -304,7 +304,6 @@ class Stats
     }
 
     /**
-     * /**
      * Prepare an email text report, including custom data.
      *
      * @param array $custom_data Optional custom data to be included

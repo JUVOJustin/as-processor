@@ -101,7 +101,7 @@ abstract class Base_DB {
 	 * Magic method to handle dynamic method calls.
 	 *
 	 * @param string $name The name of the method being called.
-	 * @param array $arguments The arguments passed to the method.
+	 * @param array  $arguments The arguments passed to the method.
 	 *
 	 * @return mixed The return value of the dynamically called method.
 	 *
@@ -109,11 +109,11 @@ abstract class Base_DB {
 	 *
 	 * @see \wpdb::__call() Maps magic calls to wpdb methods.
 	 */
-	public function __call(string $name, array $arguments) {
-		if (!method_exists($this->db, $name)) {
-			throw new \BadMethodCallException("Method {$name} does not exist on wpdb instance.");
+	public function __call( string $name, array $arguments ) {
+		if ( ! method_exists( $this->db, $name ) ) {
+			throw new \BadMethodCallException( esc_attr( "Method {$name} does not exist on wpdb instance." ) );
 		}
 
-		return $this->db->$name(...$arguments);
+		return $this->db->$name( ...$arguments );
 	}
 }

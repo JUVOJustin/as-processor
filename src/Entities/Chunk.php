@@ -218,14 +218,10 @@ class Chunk {
 			return 0.0;
 		}
 
-		$end   = $this->end;
-		$start = $this->start;
+		// Calculate duration using `U.u` format for precise timestamps
+		$end_time   = (float) $this->end->format( 'U.u' );
+		$start_time = (float) $this->start->format( 'U.u' );
 
-		// Get timestamps with microseconds
-		$end_time   = (float) sprintf( '%d.%d', $end->getTimestamp(), (int) $end->format( 'u' ) / 1000 );
-		$start_time = (float) sprintf( '%d.%d', $start->getTimestamp(), (int) $start->format( 'u' ) / 1000 );
-
-		// Simple subtraction gives us the duration in seconds
 		return $end_time - $start_time;
 	}
 
@@ -329,31 +325,31 @@ class Chunk {
 	private function to_insert(): array {
 		$data = array();
 
-		if ( $this->chunk_id !== null ) {
+		if ( null !== $this->chunk_id ) {
 			$data['id'] = $this->chunk_id;
 		}
 
-		if ( $this->group !== null ) {
+		if ( null !== $this->group ) {
 			$data['group'] = $this->group;
 		}
 
-		if ( $this->status !== null ) {
+		if ( null !== $this->status ) {
 			$data['status'] = $this->status->value;
 		}
 
-		if ( $this->data !== null ) {
+		if ( null !== $this->data ) {
 			$data['data'] = serialize( $this->data ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
 		}
 
-		if ( $this->action_id !== null ) {
+		if ( null !== $this->action_id ) {
 			$data['action_id'] = $this->action_id;
 		}
 
-		if ( $this->start !== null ) {
+		if ( null !== $this->start ) {
 			$data['start'] = (float) $this->start->format( 'U.u' );
 		}
 
-		if ( $this->end !== null ) {
+		if ( null !== $this->end ) {
 			$data['end'] = (float) $this->end->format( 'U.u' );
 		}
 
