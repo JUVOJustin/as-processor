@@ -77,17 +77,68 @@ class Chunk_DB extends Base_DB {
 	 * Retrieves one row from the database
 	 *
 	 * @param string $query
-	 * @return bool|Chunk
+	 * @return ?Chunk
 	 */
-	public function get_chunk( string $query ): bool|Chunk {
+	public function get_chunk( string $query ): ?Chunk {
 
 		$row = $this->db->get_row( $query, ARRAY_A );
 
 		if ( ! $row ) {
-			return false; // No data found
+			return null;
 		}
 
 		return Chunk::from_array( $row );
+	}
+
+	/**
+	 * Retrieves the action with the longest execution duration from the specified group.
+	 *
+	 * @param string $group_name The name of the group to retrieve the slowest action from.
+	 * @return Chunk|null The Chunk object representing the slowest action in the group,
+	 *                    or null if no matching action is found.
+	 */
+	public function get_slowest_action(string $group_name): ?Chunk
+	{
+		$query = $this->db->prepare(
+			"SELECT *, (end - start) as duration 
+            FROM ". $this->get_table_name() ."
+            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
+            ORDER BY duration DESC 
+            LIMIT 1",
+			$group_name
+		);
+		$chunk = $this->get_chunk($query);
+
+		if (!$chunk) {
+			return null;
+		}
+
+		return $chunk;
+	}
+
+	/**
+	 * Retrieves the fastest action (chunk) for the specified group based on execution duration.
+	 *
+	 * @param string $group_name The name of the group to filter actions by.
+	 * @return Chunk|null The fastest Chunk object based on duration, or null if no matching actions are found.
+	 */
+	public function get_fastest_action(string $group_name): ?Chunk
+	{
+		$query = $this->db->prepare(
+			"SELECT *, (end - start) as duration 
+            FROM ". $this->get_table_name() ."
+            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
+            ORDER BY duration ASC 
+            LIMIT 1",
+			$group_name
+		);
+		$chunk = $this->get_chunk($query);
+
+		if (!$chunk) {
+			return null;
+		}
+
+		return $chunk;
 	}
 
 	/**

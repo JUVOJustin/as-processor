@@ -71,42 +71,6 @@ class Stats
     }
 
     /**
-     * Gets actions filtered by status.
-     *
-     * @param ProcessStatus|array<ProcessStatus> $status Status to filter by.
-     * @param bool $include_durations Whether to include durations.
-     * @param bool $human_time Whether to return human-readable time.
-     * @return array
-     */
-    public function get_actions_by_status(ProcessStatus|array $status, bool $include_durations = false, bool $human_time = false): array
-    {
-        $statuses = is_array($status) ? $status : [$status];
-        $status_values = array_map(static fn(ProcessStatus $status): string => $status->value, $statuses);
-
-        $placeholders = array_fill(0, count($status_values), '%s');
-        $query = Chunk_DB::db()->prepare(
-            "SELECT * FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND status IN (" . implode(',', $placeholders) . ")",
-            array_merge([$this->group_name], $status_values)
-        );
-
-        $results = Chunk_DB::db()->get_results($query, ARRAY_A);
-
-        if ($include_durations) {
-            foreach ($results as &$action) {
-                if (!empty($action['start']) && !empty($action['end'])) {
-                    $duration = round((float)$action['end'] - (float)$action['start'], 4);
-                    $action['duration'] = $human_time
-                        ? Helper::human_time_diff_microseconds(0, $duration)
-                        : $duration;
-                }
-            }
-        }
-
-        return $results;
-    }
-
-    /**
      * Gets the average action duration.
      *
      * @param bool $human_time Whether to return human-readable time.
@@ -125,54 +89,6 @@ class Stats
         return $human_time ?
             Helper::human_time_diff_microseconds(0, $average) :
             $average;
-    }
-
-    /**
-     * Gets the slowest action.
-     *
-     * @return ?Chunk
-	 */
-    public function get_slowest_action(): ?Chunk
-	{
-        $query = Chunk_DB::db()->prepare(
-            "SELECT *, (end - start) as duration 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
-            ORDER BY duration DESC 
-            LIMIT 1",
-            $this->group_name
-        );
-		$chunk = Chunk_DB::db()->get_chunk($query);
-
-		if (!$chunk) {
-			return null;
-		}
-
-		return $chunk;
-    }
-
-    /**
-     * Gets the fastest action.
-     *
-     * @return ?Chunk
-	 */
-    public function get_fastest_action(): ?Chunk
-	{
-        $query = Chunk_DB::db()->prepare(
-            "SELECT *, (end - start) as duration 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
-            ORDER BY duration ASC 
-            LIMIT 1",
-            $this->group_name
-        );
-        $chunk = Chunk_DB::db()->get_chunk($query);
-
-        if (!$chunk) {
-            return null;
-        }
-
-        return $chunk;
     }
 
     /**
@@ -241,8 +157,8 @@ class Stats
             'total_actions'           => $this->get_total_actions(),
             'sync_duration'           => $this->get_sync_duration(),
             'average_action_duration' => $this->get_average_action_duration(),
-            'slowest_action'          => $this->get_slowest_action(),
-            'fastest_action'          => $this->get_fastest_action(),
+            'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name),
+            'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name),
             'actions'                 => Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name),
             'custom_data'             => $custom_data
         ];
@@ -263,8 +179,8 @@ class Stats
         $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), $this->get_total_actions()) . "\n";
         $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), $this->get_sync_duration(true)) . "\n";
         $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), $this->get_average_action_duration(true)) . "\n";
-        $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, $this->get_slowest_action()?->get_duration()) ) . "\n";
-        $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, $this->get_fastest_action()?->get_duration()) ) . "\n";
+        $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_slowest_action($this->group_name)?->get_duration()) ) . "\n";
+        $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_fastest_action($this->group_name)?->get_duration()) ) . "\n";
 
 		// Append custom data if available
 		if (!empty($custom_data)) {
