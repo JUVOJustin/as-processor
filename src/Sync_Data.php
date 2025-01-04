@@ -205,6 +205,7 @@ trait Sync_Data {
 				} else {
 					$this->get_data_db()->replace( $lock_key, false, $lock_ttl );
 				}
+				return;
 			} catch ( Sync_Data_Lock_Exception $e ) {
 				// Add random jitter to the delay (8% jitter in both directions)
 				$jitter = wp_rand( -80000, 80000 ) / 1000000; // Random jitter between -0.08s and +0.08s
