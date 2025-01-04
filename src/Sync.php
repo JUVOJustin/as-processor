@@ -92,10 +92,13 @@ abstract class Sync implements Syncable {
 				);
 			}
 		);
-		add_action( 'asp/cleanup', function() {
-			Chunk_DB::db()->cleanup();
-			Data_DB::db()->delete_expired_data();
-		} );
+		add_action(
+			'asp/cleanup',
+			function () {
+				Chunk_DB::db()->cleanup();
+				Data_DB::db()->delete_expired_data();
+			}
+		);
 	}
 
 	/**

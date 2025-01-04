@@ -232,16 +232,4 @@ trait Sync_Data {
 		// Assume unfamiliar systems don't support DB locks
 		return false;
 	}
-
-	/**
-	 * Cleans up synchronization-related data from the options table.
-	 *
-	 * This method removes or processes options from the database that are associated with a specific synchronization prefix or group.
-	 * It either deletes matching groups or tries to get the value what automatically checks if the time limit is reached and deletes the option when needed.
-	 *
-	 * @return void
-	 */
-	public function cleanup_sync_data(): void {
-		Data_DB::db()->delete_expired_data();
-	}
 }
