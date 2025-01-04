@@ -198,8 +198,6 @@ class Stats
      */
     public function get_sync_start(): ?DateTimeImmutable
     {
-		Chunk_DB::db()->
-
         $query = Chunk_DB::db()->prepare(
             "SELECT start
             FROM ". Chunk_DB::db()->get_table_name() ."
