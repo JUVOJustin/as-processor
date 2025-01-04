@@ -26,6 +26,8 @@ class Data_DB extends Base_DB {
             `name` varchar(255) NOT NULL,
             `data` longtext NOT NULL,
             `expires` DATETIME NOT NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
         	UNIQUE KEY `unique_name` (`name`)
         ) {$charset_collate}";
