@@ -101,7 +101,7 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 		add_action(
 			$this->get_sync_name() . '/complete',
 			function () {
-				$this->cleanup_sync_data( $this->get_sync_data_name() );
+				$this->cleanup_sync_data();
 			},
 			999
 		);
