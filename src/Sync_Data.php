@@ -38,7 +38,7 @@ trait Sync_Data {
 	 * @return mixed
 	 */
 	protected function get_sync_data( string $key ): mixed {
-		return Data_DB::db()->get( $this->get_sync_data_name() . '_' . $key )['data'];
+		return Data_DB::db()->get( $this->get_sync_data_name() . '_' . $key, 'data' );
 	}
 
 	/**
