@@ -9,6 +9,7 @@ namespace juvo\AS_Processor;
 
 use Exception;
 use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
+use juvo\AS_Processor\DB\Data_DB;
 
 /**
  * Trait Sync_Data
@@ -20,6 +21,7 @@ use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
  */
 trait Sync_Data {
 
+
 	/**
 	 * Sync Data Name.
 	 * Each data key is stored in a separate transient with the scheme "$this->sync_data_name_$key".
@@ -30,11 +32,24 @@ trait Sync_Data {
 	private string $sync_data_name;
 
 	/**
-	 * List of data keys that are locked by the current process.
+	 * Instance of the database handler
 	 *
-	 * @var string[]
+	 * @var ?Data_DB
 	 */
-	private array $locked_by_current_process = array();
+	private ?Data_DB $data_db = null;
+
+	/**
+	 * Get the Data_DB instance.
+	 *
+	 * @return Data_DB
+	 */
+	private function get_data_db(): Data_DB {
+		if ( is_null( $this->data_db ) ) {
+			$this->data_db = new Data_DB();
+			$this->data_db->ensure_table();
+		}
+		return $this->data_db;
+	}
 
 	/**
 	 * Returns the sync data from a transient
@@ -43,24 +58,7 @@ trait Sync_Data {
 	 * @return mixed
 	 */
 	protected function get_sync_data( string $key ): mixed {
-		$transient = $this->get_transient( $this->get_sync_data_name() . '_' . $key );
-
-		// Return false if there's no data
-		if ( empty( $transient ) ) {
-			return false;
-		}
-
-		return $transient;
-	}
-
-	/**
-	 * Checks if a lock is currently held.
-	 *
-	 * @param string $key The key of the transient.
-	 * @return bool True if the lock is held, false otherwise.
-	 */
-	protected function is_locked( string $key ): bool {
-		return (bool) $this->get_transient( $this->get_sync_data_name() . '_' . $key . '_lock' );
+		return $this->get_data_db()->get( $this->get_sync_data_name() . '_' . $key )['data'];
 	}
 
 	/**
@@ -91,11 +89,7 @@ trait Sync_Data {
 	}
 
 	/**
-	 * Updates synchronization data with new values, applying optional merge strategies.
-	 *
-	 * This method retrieves the current data associated with the given key, applies the specified updates,
-	 * and saves the modified data back with the defined expiration. The process respects specified merge
-	 * and concatenation behaviors and includes a retry mechanism for ensuring successful execution.
+	 * Updates synchronization data directly in the options table.
 	 *
 	 * @param string $key The key identifying the synchronization data to update.
 	 * @param mixed  $updates The data to update the synchronization data with.
@@ -104,162 +98,170 @@ trait Sync_Data {
 	 * @param int    $expiration Optional. The expiration time (in seconds) for the updated data. Default is 6 hours.
 	 *
 	 * @return void
-	 *
-	 * @throws Sync_Data_Lock_Exception If the data update fails after multiple attempts.
-	 * @throws Exception Thrown when the maximum backoff time is reached and the process failed.
+	 * @throws Exception If the maximum retry time is reached.
 	 */
 	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
-		$delay           = 0.1; // Initial delay in seconds
-		$total_wait_time = 0;
+		// Set lock
+		$this->set_key_lock( $key, true );
 
-		do {
-			try {
+		// Handle merging logic
+		if ( $deep_merge || $concat_arrays ) {
 
-				// Lock data first
-				if ( $this->is_locked( $key ) && ! $this->is_key_locked_by_current_process( $key ) ) {
-					/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
-					throw new Sync_Data_Lock_Exception( sprintf( esc_attr__( 'Lock for "%1$s" is already acquired by another process. Waited %2$s seconds to acquire the lock.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
-				}
+			// Retrieve the current data.
+			$current_data = $this->get_sync_data( $key );
 
-				$this->set_key_lock( $key, true );
-
-				// Check if values is supposed to be an array
-				if ( $deep_merge || $concat_arrays ) {
-
-					// Retrieve the current transient data.
-					$current_data = $this->get_sync_data( $key );
-
-					// If current data not initialized yet make it an array
-					if ( ! $current_data ) {
-						$current_data = array();
-					}
-
-					// At this point if current data is an array and one of the merge options is used we can assume the update should also be an array to be merged
-					if ( is_array( $current_data ) && ! is_array( $updates ) ) {
-						$updates = array( $updates );
-					}
-
-					// Merge the new updates into the current data, respecting the deepMerge and concatArrays flags.
-					if ( is_array( $current_data ) && is_array( $updates ) ) {
-						$updates = Helper::merge_arrays( $current_data, $updates, $deep_merge, $concat_arrays );
-					}
-				}
-
-				// Save the updated data back into the transient.
-				set_transient( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
-
-				// Unlock
-				$this->set_key_lock( $key, false );
-				return;
-			} catch ( Sync_Data_Lock_Exception $e ) {
-				$this->log( $e->getMessage() );
-
-				usleep( (int) ( $delay * 1000000 ) ); // Convert delay to microseconds
-				$total_wait_time += $delay;
-				$delay           *= 2; // Double the delay
-				continue;
+			// If current data not initialized yet make it an array
+			if ( ! $current_data ) {
+				$current_data = array();
 			}
-		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $key, $total_wait_time ) ) );
 
-		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
-		throw new Exception( sprintf( esc_attr__( 'Failed to update sync data "%1$s". Tried %2$s seconds.', 'as-processor' ), esc_attr( $key ), number_format( $total_wait_time, 2 ) ) );
-	}
-
-	/**
-	 * Get the most recent transient value
-	 *
-	 * Due to the nature of transients and how WordPress handels object caching, this wrapper is needed to always get
-	 * the most recent value from the cache.
-	 *
-	 * WordPress caches transients in the options group if no external object cache is used.
-	 * These caches are also deleted before querying the new db value.
-	 *
-	 * When an external object cache is used, the get_transient is avoided completely and a forced wp_cache_get is used.
-	 *
-	 * @param string $key Key of the transient to get.
-	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
-	 */
-	private function get_transient( string $key ) {
-
-		if ( ! wp_using_ext_object_cache() ) {
-
-			// Delete transient cache
-			$deletion_key = '_transient_' . $key;
-			wp_cache_delete( $deletion_key, 'options' );
-
-			// Delete timeout cache
-			$deletion_key = '_transient_timeout_' . $key;
-			wp_cache_delete( $deletion_key, 'options' );
-
-			// At this point object cache is cleared and can be requested again
-			$data = get_transient( $key );
-		} else {
-			$data = wp_cache_get( $key, 'transient', true );
+			if ( is_array( $current_data ) && is_array( $updates ) ) {
+				$updates = Helper::merge_arrays( $current_data, $updates, $deep_merge, $concat_arrays );
+			}
 		}
 
-		return $data;
+		$success = $this->get_data_db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
+		if ( ! $success ) {
+			throw new Exception(
+			/* translators: 1: The key name of the sync data trying to update. */
+				sprintf( esc_attr__( 'Failed to update sync data for key %s', 'as-processor' ), esc_attr( $key ) )
+			);
+		}
+
+		// Release lock
+		$this->set_key_lock( $key, false );
 	}
 
 	/**
-	 * Fully deletes the sync data
-	 *
-	 * @return void
-	 */
-	public function delete_sync_data(): void {
-		global $wpdb;
-
-		// Define the base name of your transient
-		$base_transient_name = $this->get_sync_data_name() . '_';
-
-		// Prepare the like pattern for SQL, escaping wildcards and adding the wildcard placeholder
-		$like_pattern = $wpdb->esc_like( '_transient_' . $base_transient_name ) . '%';
-
-		// Use $wpdb to directly delete transients from the wp_options table
-		$wpdb->query(
-			$wpdb->prepare(
-				"
-                DELETE FROM $wpdb->options
-                WHERE option_name LIKE %s
-                ",
-				$like_pattern
-			)
-		);
-	}
-
-	/**
-	 * Determines if the given key is currently locked by the current process.
-	 *
-	 * This method checks if the specified key is marked as locked in the
-	 * context of the current process.
-	 *
-	 * @param string $key The unique identifier for the lock.
-	 * @return bool True if the key is locked by the current process, otherwise false.
-	 */
-	protected function is_key_locked_by_current_process( string $key ): bool {
-		return isset( $this->locked_by_current_process[ $key ] ) && $this->locked_by_current_process[ $key ];
-	}
-
-	/**
-	 * Set a lock state for a specific key with an optional time-to-live (TTL).
-	 *
-	 * This method updates the lock state for the specified key and sets a transient lock with a given TTL, if the state is true.
-	 * The lock helps in synchronizing processes to prevent conflicts.
+	 * Set a lock state for a specific key using MySQL GET_LOCK if available, or fallback to the current method.
 	 *
 	 * @param string $key The key for which the lock state is being set.
 	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
 	 * @return void
+	 * @throws Sync_Data_Lock_Exception When the current lock is set by another process.
 	 */
 	protected function set_key_lock( string $key, bool $state ): void {
-		$this->locked_by_current_process[ $key ] = $state;
+		$lock_key = $this->get_sync_data_name() . '_' . $key . '_lock';
+
+		// Fallback to using transient-based locking if database locks are not supported
+		if ( ! $this->supports_db_locks() ) {
+			$this->set_option_lock( $lock_key, $state );
+		}
+
+		// Use database-based locking for better reliability when available
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		global $wpdb;
+
+		// Use a unique lock name (prefix it if needed)
+		$db_lock_key = $wpdb->esc_like( $lock_key );
 
 		if ( $state ) {
-			// Allow the lock TTL to be filtered using a specific hook.
-			$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $key );
+			// Try to acquire a lock using MySQL GET_LOCK
+			$result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $db_lock_key, apply_filters( 'asp/sync_data/max_wait_time', 5, $key ) ) );
 
-			set_transient( $this->get_sync_data_name() . '_' . $key . '_lock', true, $lock_ttl );
+			if ( ! $result ) {
+				throw new Sync_Data_Lock_Exception(
+				/* translators: 1: The name of the key for which is database lock is acquired. */
+					sprintf( esc_attr__( 'Failed to acquire database lock for %s', 'as-processor' ), esc_attr( $lock_key ) )
+				);
+			}
 		} else {
-			delete_transient( $this->get_sync_data_name() . '_' . $key . '_lock' );
+			// Release the lock using MySQL RELEASE_LOCK
+			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $db_lock_key ) );
 		}
+		// phpcs:enable
+	}
+
+	/**
+	 * Fallback mechanism to set a data-based lock.
+	 *
+	 * @param string $lock_key The key for which the lock state is being set.
+	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
+	 * @return void
+	 * @throws Sync_Data_Lock_Exception When the lock could not be acquired.
+	 */
+	protected function set_option_lock( string $lock_key, bool $state ): void {
+
+		$delay           = 0.1;
+		$total_wait_time = 0;
+
+		do {
+			try {
+				$lock_content = (int) $this->get_data_db()->get( $lock_key, 'data' );
+
+				// Check if another process owns the lock
+				if ( $lock_content && $this->action_id !== $lock_content ) {
+					throw new Sync_Data_Lock_Exception(
+						esc_attr( sprintf( 'Failed to acquire option lock for %s', $lock_key ) )
+					);
+				}
+
+				$lock_ttl = apply_filters( 'asp/sync_data/lock_ttl', 5 * MINUTE_IN_SECONDS, $lock_key );
+
+				// Set or clear the transient-based lock
+				if ( $state ) {
+					$this->get_data_db()->replace( $lock_key, $this->action_id, $lock_ttl );
+				} else {
+					$this->get_data_db()->replace( $lock_key, false, $lock_ttl );
+				}
+				return;
+			} catch ( Sync_Data_Lock_Exception $e ) {
+				// Add random jitter to the delay (8% jitter in both directions)
+				$jitter = wp_rand( -80000, 80000 ) / 1000000; // Random jitter between -0.08s and +0.08s
+				$delay  = $delay + $jitter;
+
+				$this->log(
+					sprintf(
+						/* translators: 1: Exception message, 2: Number of seconds the process will wait till next retry. */
+						esc_attr__( '%1$s. Next try in %2$s seconds.', 'as-processor' ),
+						esc_attr( $e->getMessage() ),
+						number_format( $delay, 2 )
+					)
+				);
+				usleep( (int) ( $delay * 1000000 ) );
+
+				$total_wait_time += $delay;
+				$delay            = $delay * 1.4;
+			}
+		} while ( $total_wait_time < floatval( apply_filters( 'asp/sync_data/max_wait_time', 5, $lock_key, $total_wait_time ) ) );
+
+		/* translators: 1: Key being locked, 2: Number of seconds the process waited for the lock release. */
+		throw new Sync_Data_Lock_Exception( sprintf( esc_attr__( 'Failed to acquire option lock for "%1$s". Tried %2$s seconds.', 'as-processor' ), esc_attr( $lock_key ), number_format( $total_wait_time, 2 ) ) );
+	}
+
+	/**
+	 * Check if the current database system supports native MySQL/MariaDB locks.
+	 *
+	 * @return bool True if the system supports MySQL/MariaDB-level locks, false otherwise.
+	 */
+	private function supports_db_locks(): bool {
+		global $wpdb;
+
+		// Temporary - This will be in wp-config.php once SQLite is merged in Core.
+		if ( defined( 'DB_ENGINE' ) && 'mysql' !== DB_ENGINE ) {
+			return false;
+		}
+
+		// Optionally check db_version (MariaDB versions begin with '10')
+		$db_version = $wpdb->db_version();
+		if ( str_contains( strtolower( $db_version ), 'mariadb' ) || version_compare( $db_version, '5.7', '>=' ) ) {
+			return true; // MariaDB or MySQL version 5.7+ supports GET_LOCK
+		}
+
+		// Assume unfamiliar systems don't support DB locks
+		return false;
+	}
+
+	/**
+	 * Cleans up synchronization-related data from the options table.
+	 *
+	 * This method removes or processes options from the database that are associated with a specific synchronization prefix or group.
+	 * It either deletes matching groups or tries to get the value what automatically checks if the time limit is reached and deletes the option when needed.
+	 *
+	 * @return void
+	 */
+	public function cleanup_sync_data(): void {
+		$this->get_data_db()->delete_expired_data();
 	}
 }
