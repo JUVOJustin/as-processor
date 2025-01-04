@@ -17,6 +17,13 @@ use wpdb;
 abstract class Base_DB {
 
 	/**
+	 * Singelton Instance of Database Class
+	 *
+	 * @var ?Base_DB
+	 */
+	protected static ?Base_DB $instance = null;
+
+	/**
 	 * WordPress database wrapper instance.
 	 *
 	 * @var \wpdb
@@ -37,10 +44,23 @@ abstract class Base_DB {
 	 */
 	private bool $table_checked = false;
 
+
+	/**
+	 * Retrieve the singleton instance of the class, creating it if necessary.
+	 *
+	 * @return static The singleton instance of the class.
+	 */
+	public static function db(): static {
+		if (!static::$instance instanceof static) {
+			static::$instance = new static();
+		}
+		return static::$instance;
+	}
+
 	/**
 	 * Constructor.
 	 */
-	public function __construct() {
+	final private function __construct() {
 		global $wpdb;
 		$this->db = $wpdb;
 	}
