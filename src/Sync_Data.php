@@ -9,6 +9,7 @@ namespace juvo\AS_Processor;
 
 use Exception;
 use juvo\AS_Processor\Entities\Sync_Data_Lock_Exception;
+use \juvo\AS_Processor\DB\Data_DB;
 
 /**
  * Trait Sync_Data
@@ -30,20 +31,31 @@ trait Sync_Data {
 	private string $sync_data_name;
 
 	/**
+	 * @var ?Data_DB Instance of the database handler
+	 */
+	private ?Data_DB $data_db = null;
+
+	/**
+	 * Get the Data_DB instance.
+	 *
+	 * @return Data_DB
+	 */
+	private function get_data_db(): Data_DB {
+		if ( is_null( $this->data_db ) ) {
+			$this->data_db = new Data_DB();
+			$this->data_db->ensure_table();
+		}
+		return $this->data_db;
+	}
+
+	/**
 	 * Returns the sync data from a transient
 	 *
 	 * @param string $key Key of the sync data to retrieve.
 	 * @return mixed
 	 */
 	protected function get_sync_data( string $key ): mixed {
-		$transient = $this->get_option( $this->get_sync_data_name() . '_' . $key );
-
-		// Return false if there's no data
-		if ( empty( $transient ) ) {
-			return false;
-		}
-
-		return $transient;
+		return $this->get_data_db()->get( $this->get_sync_data_name() . '_' . $key )['data'];
 	}
 
 	/**
@@ -111,8 +123,7 @@ trait Sync_Data {
 					}
 				}
 
-				// Save the updated data back into the transient.
-				$this->update_option( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
+				$this->get_data_db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
 
 				// Release lock
 				$this->set_key_lock( $key, false );
@@ -182,7 +193,7 @@ trait Sync_Data {
 	}
 
 	/**
-	 * Fallback mechanism to set a transient-based lock.
+	 * Fallback mechanism to set a data-based lock.
 	 *
 	 * @param string $lock_key The key for which the lock state is being set.
 	 * @param bool   $state Determines whether to enable (true) or disable (false) the key lock.
@@ -190,7 +201,7 @@ trait Sync_Data {
 	 * @throws Sync_Data_Lock_Exception When the current lock is set by another process.
 	 */
 	protected function set_option_lock( string $lock_key, bool $state ): void {
-		$lock_content = $this->get_option( $lock_key );
+		$lock_content = $this->get_data_db()->get( $lock_key );
 
 		// Check if another process owns the lock
 		if ( $lock_content && $this->action_id !== $lock_content ) {
@@ -203,9 +214,9 @@ trait Sync_Data {
 
 		// Set or clear the transient-based lock
 		if ( $state ) {
-			$this->update_option( $lock_key, $this->action_id, $lock_ttl );
+			$this->get_data_db()->replace( $lock_key, $this->action_id, $lock_ttl );
 		} else {
-			$this->update_option( $lock_key, false, $lock_ttl );
+			$this->get_data_db()->replace( $lock_key, false, $lock_ttl );
 		}
 	}
 
@@ -233,64 +244,6 @@ trait Sync_Data {
 	}
 
 	/**
-	 * Get the most recent option value
-	 *
-	 * Due to the nature of options and how WordPress handels object caching, this wrapper is needed to always get
-	 * the most recent value from the cache.
-	 *
-	 * WordPress caches transients and options if no external object cache is used.
-	 * These caches are also deleted before querying the new db value.
-	 *
-	 * When an external object cache is used a forced wp_cache_get is used.
-	 *
-	 * @param string $key Key of the transient to get.
-	 * @link https://github.com/rhubarbgroup/redis-cache/issues/523
-	 */
-	private function get_option( string $key ) {
-		if ( ! str_contains( $key, 'asp_' ) ) {
-			$key = 'asp_' . $key;
-		}
-
-		if ( ! wp_using_ext_object_cache() ) {
-
-			// Delete transient cache
-			wp_cache_delete( $key, 'options' );
-			$data = get_option( $key );
-		} else {
-			$data = wp_cache_get( $key, 'options', true );
-		}
-
-		if ( empty( $data['value'] ) || ( isset( $data['timestamp'] ) && $data['timestamp'] < time() ) ) {
-			return false;
-		}
-
-		return $data['value'];
-	}
-
-	/**
-	 * Updates an option in the options table with a new value and timestamp.
-	 *
-	 * @param string $key The option name or key to update.
-	 * @param mixed  $value The new value to be stored.
-	 * @param int    $timestamp The timestamp offset to be added to the current time.
-	 * @return bool True if the option value was successfully updated, false otherwise.
-	 */
-	protected function update_option( string $key, mixed $value, int $timestamp ): bool {
-		if ( ! str_contains( $key, 'asp_' ) ) {
-			$key = 'asp_' . $key;
-		}
-
-		return update_option(
-			$key,
-			array(
-				'timestamp' => time() + $timestamp,
-				'value'     => $value,
-			),
-			false
-		);
-	}
-
-	/**
 	 * Cleans up synchronization-related data from the options table.
 	 *
 	 * This method removes or processes options from the database that are associated with a specific synchronization prefix or group.
@@ -300,31 +253,11 @@ trait Sync_Data {
 	 * @return void
 	 */
 	public function cleanup_sync_data( string $force_delete_group = '' ): void {
+		$table_name = $this->get_data_db()->get_table_name();
+
 		global $wpdb;
-
-		// Query options table for keys matching the pattern.
-		$results = $wpdb->get_results(
-			$wpdb->prepare(
-				"
-           SELECT option_name 
-           FROM {$wpdb->options} 
-           WHERE option_name LIKE %s",
-				'asp_%' // sanitize the LIKE pattern
-			),
-			ARRAY_A
+		$wpdb->query(
+			$wpdb->prepare( "DELETE FROM {$table_name} WHERE expires < %s", current_time( 'mysql' ) )
 		);
-
-		foreach ( $results as $row ) {
-			$option_name = $row['option_name'];
-
-			// Maybe force delete option
-			if ( ! empty( $force_delete_group ) && str_contains( $option_name, $force_delete_group ) ) {
-				delete_option( $option_name );
-			}
-
-			if ( ! $this->get_option( $option_name ) ) {
-				delete_option( $option_name );
-			}
-		}
 	}
 }
