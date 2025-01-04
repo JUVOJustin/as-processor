@@ -102,10 +102,10 @@ trait Sync_Data {
 	 */
 	protected function update_sync_data( string $key, mixed $updates, bool $deep_merge = false, bool $concat_arrays = false, int $expiration = HOUR_IN_SECONDS * 6 ): void {
 
-			// Set lock
-			$this->set_key_lock( $key, true );
+		// Set lock
+		$this->set_key_lock( $key, true );
 
-			// Handle merging logic
+		// Handle merging logic
 		if ( $deep_merge || $concat_arrays ) {
 
 			// Retrieve the current data.
@@ -121,7 +121,7 @@ trait Sync_Data {
 			}
 		}
 
-			$success = $this->get_data_db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
+		$success = $this->get_data_db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
 		if ( ! $success ) {
 			throw new Exception(
 			/* translators: 1: The key name of the sync data trying to update. */
@@ -129,8 +129,8 @@ trait Sync_Data {
 			);
 		}
 
-			// Release lock
-			$this->set_key_lock( $key, false );
+		// Release lock
+		$this->set_key_lock( $key, false );
 	}
 
 	/**
