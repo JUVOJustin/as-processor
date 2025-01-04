@@ -91,36 +91,53 @@ class Chunk_DB extends Base_DB {
 	}
 
 	/**
-	 * Gets actions filtered by status.
+	 * Retrieves chunks from the database filtered by the provided group name and statuses.
 	 *
-	 * @param ProcessStatus|array<ProcessStatus> $status Status to filter by.
-	 * @param string                             $group_name
-	 * @return Chunk[]
+	 * @param string $group_name The group name to filter chunks by.
+	 * @param ProcessStatus|ProcessStatus[]|null $status Optional. A single status, an array of statuses, or null.
+	 *                                          If null, no status filter is applied.
+	 *                                          If an array, all provided statuses are included in the filter.
+	 *                                          If a single status, only chunks matching that status are returned.
+	 * @return array An array of Chunk objects matching the specified group name and status conditions.
+	 *               Returns an empty array if no results are found.
 	 */
-	public function get_chunks_by_status( ProcessStatus|array $status, string $group_name ): array {
-		$statuses      = is_array( $status ) ? $status : array( $status );
-		$status_values = array_map( static fn( ProcessStatus $status ): string => $status->value, $statuses );
+	public function get_chunks_by_status( string $group_name, ProcessStatus|array|null $status = null ): array {
 
-		$placeholders = array_fill( 0, count( $status_values ), '%s' );
-		$query        = $this->db->prepare(
-			'SELECT * FROM ' . $this->get_table_name() . '
-            WHERE `group` = %s AND status IN (' . implode( ',', $placeholders ) . ')',
-			array_merge( array( $group_name ), $status_values )
-		);
+		// If no status is provided, don't filter or include all possible statuses
+		if (null === $status) {
+			$query = $this->db->prepare(
+				'SELECT * FROM ' . $this->get_table_name() . ' WHERE `group` = %s',
+				$group_name
+			);
+		} else {
+			// Handle single status or multiple statuses
+			$statuses      = is_array($status) ? $status : array($status);
+			$status_values = array_map(
+				static fn(ProcessStatus $status): string => $status->value,
+				$statuses
+			);
 
-		$results = self::db()->get_results( $query, ARRAY_A );
-		if ( empty( $results ) ) {
+			$placeholders = array_fill(0, count($status_values), '%s');
+			$query        = $this->db->prepare(
+				'SELECT * FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s AND status IN (' . implode(',', $placeholders) . ')',
+				array_merge(array($group_name), $status_values)
+			);
+		}
+
+		// Execute the query and fetch results
+		$results = self::db()->get_results($query, ARRAY_A);
+		if (empty($results)) {
 			return array();
 		}
 
-		$results = array_map(
-			function ( $row ) {
-				return Chunk::from_array( $row );
+		// Map results to Chunk objects
+		return array_map(
+			function ($row) {
+				return Chunk::from_array($row);
 			},
 			$results
 		);
-
-		return $results;
 	}
 
 	/**

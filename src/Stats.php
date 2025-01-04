@@ -228,44 +228,6 @@ class Stats
     }
 
     /**
-     * Gets all actions for the current sync group.
-     *
-     * @return array<int, array{
-     *     id: int,
-     *     name: string,
-     *     group: string,
-     *     status: ProcessStatus
-     * }>
-     */
-    public function get_actions(): array
-    {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT `id`, `name`, `group`, `status` 
-            FROM ". Chunk_DB::db()->get_table_name() ." 
-            WHERE `group` = %s",
-            $this->group_name
-        );
-
-        $results = Chunk_DB::db()->get_results($query, ARRAY_A);
-
-        if (!is_array($results)) {
-            return [];
-        }
-
-        return array_map(
-            static function(array $row): array {
-                return [
-                    'id' => (int)$row['id'],
-                    'name' => $row['name'],
-                    'group' => $row['group'],
-                    'status' => ProcessStatus::from($row['status'])
-                ];
-            },
-            $results
-        );
-    }
-
-    /**
      * Get the object as a JSON string, including custom data.
      *
      * @param array $custom_data Optional custom data to be included
@@ -281,7 +243,7 @@ class Stats
             'average_action_duration' => $this->get_average_action_duration(),
             'slowest_action'          => $this->get_slowest_action(),
             'fastest_action'          => $this->get_fastest_action(),
-            'actions'                 => $this->get_actions(),
+            'actions'                 => Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name),
             'custom_data'             => $custom_data
         ];
         return json_encode($data);
@@ -313,7 +275,7 @@ class Stats
 		}
 
         // Failed actions
-		$failed_actions = Chunk_DB::db()->get_chunks_by_status(ProcessStatus::FAILED, $this->group_name);
+		$failed_actions = Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name, status: ProcessStatus::FAILED);
 		if (!empty($failed_actions)) {
             $email_text .= "\n-- " . __("Failed Actions Detail:", 'as-processor') . " --\n";
             foreach ($failed_actions as $chunk) {
