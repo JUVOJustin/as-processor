@@ -37,8 +37,8 @@ class Data_DB extends Base_DB {
             `name` varchar(255) NOT NULL,
             `data` longtext NOT NULL,
             `expires` DATETIME NOT NULL,
-            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, 
+    		`updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
         	UNIQUE KEY `unique_name` (`name`)
         ) {$charset_collate}";
@@ -76,15 +76,17 @@ class Data_DB extends Base_DB {
 		$expires = gmdate( 'Y-m-d H:i:s', time() + $timestamp );
 
 		// Insert or update the data in the database
-		global $wpdb;
-		return $wpdb->replace(
-			$this->get_table_name(),
-			array(
-				'name'    => $name,
-				'data'    => $serialized_data,
-				'expires' => $expires,
-			),
-			array( '%s', '%s', '%s' )
+		return $this->db->query(
+			$this->db->prepare(
+				"INSERT INTO {$this->get_table_name()} (`name`, `data`, `expires`) 
+				 VALUES (%s, %s, %s)
+				 ON DUPLICATE KEY UPDATE 
+					`data` = VALUES(`data`), 
+					`expires` = VALUES(`expires`)",
+				$name,
+				$serialized_data,
+				$expires
+			)
 		);
 	}
 
@@ -94,9 +96,9 @@ class Data_DB extends Base_DB {
 	 * @param string $name The name of the data to retrieve.
 	 * @param string $column Optional. A specific column to return from the data row. Defaults to an empty string.
 	 *
-	 * @return array|false The data row as an associative array, a specific column's value if specified, or false if not found or expired.
+	 * @return mixed|false The data row as an associative array, a specific column's value if specified, or false if not found or expired.
 	 */
-	public function get( string $name, string $column = '' ): array|false {
+	public function get( string $name, string $column = '' ): mixed {
 		// Try to get the data from the database
 		$row = $this->db->get_row(
 			$this->db->prepare(
