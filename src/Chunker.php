@@ -12,6 +12,7 @@ namespace juvo\AS_Processor;
 
 use Exception;
 use Generator;
+use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\Entities\ProcessStatus;
 use juvo\AS_Processor\Entities\Chunk;
 
@@ -19,8 +20,6 @@ use juvo\AS_Processor\Entities\Chunk;
  * The Chunker.
  */
 trait Chunker {
-
-	use DB;
 
 	/**
 	 * Schedules an async action to process a chunk of data. Passed items are serialized and added to a chunk.
@@ -122,34 +121,6 @@ trait Chunker {
 	 * @return void
 	 */
 	public function cleanup_chunk_data(): void {
-		/**
-		 * Filters the number of days to keep chunk data.
-		 *
-		 * @param int $interval The interval (e.g., 14*DAY_IN_SECONDS).
-		 */
-		$interval          = apply_filters( 'asp/chunks/cleanup/interval', 14 * DAY_IN_SECONDS );
-		$cleanup_timestamp = (int) time() - $interval;
-
-		/**
-		 * Filters the status of chunks to clean up.
-		 *
-		 * @param ProcessStatus $status The status to filter by (default: 'all').
-		 */
-		$status = apply_filters( 'asp/chunks/cleanup/status', ProcessStatus::ALL );
-
-		if ( ProcessStatus::ALL === $status ) {
-			$query = $this->db()->prepare(
-				"DELETE FROM {$this->get_chunks_table_name()} WHERE start < %f",
-				$cleanup_timestamp
-			);
-		} else {
-			$query = $this->db()->prepare(
-				"DELETE FROM {$this->get_chunks_table_name()} WHERE status = %s AND start < %f",
-				$status->value,
-				$cleanup_timestamp
-			);
-		}
-
-		$this->db()->query( $query );
+		Chunk_DB::db()->cleanup();
 	}
 }

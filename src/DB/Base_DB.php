@@ -13,6 +13,8 @@ use wpdb;
  * Abstract class Base_DB.
  * Serves as a base for database-related functionality,
  * providing a structure for interacting with custom database tables.
+ *
+ * @mixin wpdb
  */
 abstract class Base_DB {
 
@@ -51,8 +53,9 @@ abstract class Base_DB {
 	 * @return static The singleton instance of the class.
 	 */
 	public static function db(): static {
-		if (!static::$instance instanceof static) {
+		if ( ! static::$instance instanceof static ) {
 			static::$instance = new static();
+			static::$instance->ensure_table();
 		}
 		return static::$instance;
 	}
@@ -93,4 +96,24 @@ abstract class Base_DB {
 	 * @return void
 	 */
 	abstract protected function maybe_create_table(): void;
+
+	/**
+	 * Magic method to handle dynamic method calls.
+	 *
+	 * @param string $name The name of the method being called.
+	 * @param array $arguments The arguments passed to the method.
+	 *
+	 * @return mixed The return value of the dynamically called method.
+	 *
+	 * @throws \BadMethodCallException If the method does not exist in wpdb.
+	 *
+	 * @see \wpdb::__call() Maps magic calls to wpdb methods.
+	 */
+	public function __call(string $name, array $arguments) {
+		if (!method_exists($this->db, $name)) {
+			throw new \BadMethodCallException("Method {$name} does not exist on wpdb instance.");
+		}
+
+		return $this->db->$name(...$arguments);
+	}
 }
