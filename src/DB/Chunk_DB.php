@@ -7,6 +7,7 @@
 
 namespace juvo\AS_Processor\DB;
 
+use DateTimeImmutable;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
 use juvo\AS_Processor\Helper;
@@ -209,32 +210,112 @@ class Chunk_DB extends Base_DB {
 	 * Calculates the synchronization duration for a specified group.
 	 *
 	 * @param string $group_name The name of the group for which the synchronization duration is calculated.
-	 * @param bool $human_time Optional. Whether to return the duration in a human-readable format. Defaults to false.
-	 *                           If true, returns the duration as a string. If false, returns the duration as a float in seconds.
+	 * @param bool   $human_time Optional. Whether to return the duration in a human-readable format. Defaults to false.
+	 *                             If true, returns the duration as a string. If false, returns the duration as a float in seconds.
 	 * @return float|string|false Returns the synchronization duration as a float in seconds or a string in human-readable format,
 	 *                            depending on the $human_time parameter. Returns false if the start or end time is not available.
 	 */
-	public function get_sync_duration(string $group_name, bool $human_time = false): float|string|false {
+	public function get_sync_duration( string $group_name, bool $human_time = false ): float|string|false {
 		$query = $this->db->prepare(
-			"SELECT MIN(start) as sync_start, MAX(end) as sync_end 
-            FROM ". $this->get_table_name() ."
-            WHERE `group` = %s",
+			'SELECT MIN(start) as sync_start, MAX(end) as sync_end 
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s',
 			$group_name
 		);
 
-		$result = $this->db->get_row($query);
+		$result = $this->db->get_row( $query );
 
-		if (empty($result->sync_start) || empty($result->sync_end)) {
+		if ( empty( $result->sync_start ) || empty( $result->sync_end ) ) {
 			return false;
 		}
 
-		$duration = round((float)$result->sync_end - (float)$result->sync_start, 4);
+		$duration = round( (float) $result->sync_end - (float) $result->sync_start, 4 );
 
-		if ($human_time) {
-			return Helper::human_time_diff_microseconds(0, $duration);
+		if ( $human_time ) {
+			return Helper::human_time_diff_microseconds( 0, $duration );
 		}
 
 		return $duration;
+	}
+
+	/**
+	 * Retrieves the earliest sync start time for the specified group.
+	 *
+	 * @param string $group_name The name of the group to retrieve the sync start time for.
+	 *                           Used to filter the records in the database.
+	 * @return DateTimeImmutable|null The earliest sync start time as a DateTimeImmutable object.
+	 *                                 Returns null if no valid start time is found.
+	 */
+	public function get_sync_start( string $group_name ): ?DateTimeImmutable {
+		$query = $this->db->prepare(
+			'SELECT start
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s
+            AND start IS NOT NULL
+            ORDER BY start ASC
+            LIMIT 1',
+			$group_name
+		);
+
+		$start = $this->db->get_var( $query );
+
+		if ( empty( $start ) ) {
+			return null;
+		}
+
+		return Helper::convert_microtime_to_datetime( $start );
+	}
+
+	/**
+	 * Retrieves the most recent synchronization end time for the specified group.
+	 *
+	 * @param string $group_name The group name to retrieve the most recent synchronization end time for.
+	 *
+	 * @return DateTimeImmutable|null The most recent end time as a DateTimeImmutable object, or null if no end time is found.
+	 */
+	public function get_sync_end( string $group_name ): ?DateTimeImmutable {
+		$query = $this->db->prepare(
+			'SELECT end
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s
+            AND end IS NOT NULL
+            ORDER BY end DESC
+            LIMIT 1',
+			$group_name
+		);
+
+		$end = $this->db->get_var( $query );
+
+		if ( empty( $end ) ) {
+			return null;
+		}
+
+		return Helper::convert_microtime_to_datetime( $end );
+	}
+
+	/**
+	 * Calculates the average duration of actions for the specified group.
+	 *
+	 * @param string $group_name The name of the group to calculate the average action duration for.
+	 * @param bool   $human_time Optional. Whether to return the duration as a human-readable string.
+	 *                             If true, the duration is formatted for readability.
+	 *                             If false, the duration is returned as a float representing microseconds.
+	 * @return float|string The average action duration. Returns a float in microseconds if $human_time is false,
+	 *                      or a human-readable string if $human_time is true.
+	 */
+	public function get_average_action_duration( string $group_name, bool $human_time = false ): float|string {
+		$query = $this->db->prepare(
+			'SELECT AVG(end - start) as avg_duration 
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL',
+			$group_name
+		);
+
+		$average = (float) $this->db->get_var( $query );
+
+		return $human_time ?
+			Helper::human_time_diff_microseconds( 0, $average ) :
+			$average;
 	}
 
 	/**

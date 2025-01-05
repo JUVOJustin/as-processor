@@ -26,79 +26,6 @@ class Stats
         $this->group_name = $group_name;
     }
 
-    /**
-     * Gets the average action duration.
-     *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return float|string
-     */
-    public function get_average_action_duration(bool $human_time = false): float|string {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT AVG(end - start) as avg_duration 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL",
-            $this->group_name
-        );
-
-        $average = (float)Chunk_DB::db()->get_var($query);
-
-        return $human_time ?
-            Helper::human_time_diff_microseconds(0, $average) :
-            $average;
-    }
-
-    /**
-     * Gets the sync start time.
-     *
-     * @return DateTimeImmutable|null
-     */
-    public function get_sync_start(): ?DateTimeImmutable
-    {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT start
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s
-            AND start IS NOT NULL
-            ORDER BY start ASC
-            LIMIT 1",
-            $this->group_name
-        );
-        
-        $start = Chunk_DB::db()->get_var($query);
-        
-        if (empty($start)) {
-            return null;
-        }
-        
-        return Helper::convert_microtime_to_datetime($start);
-    }
-    
-    /**
-     * Gets the sync end time.
-     *
-     * @return DateTimeImmutable|null
-     */
-    public function get_sync_end(): ?DateTimeImmutable
-    {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT end
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s
-            AND end IS NOT NULL
-            ORDER BY end DESC
-            LIMIT 1",
-            $this->group_name
-        );
-        
-        $end = Chunk_DB::db()->get_var($query);
-        
-        if (empty($end)) {
-            return null;
-        }
-        
-        return Helper::convert_microtime_to_datetime($end);
-    }
-
 	/**
 	 * Converts the current object state and additional data to a JSON representation.
 	 *
@@ -115,11 +42,11 @@ class Stats
 		}, $actions);
 
         $data = [
-            'sync_start'              => $this->get_sync_start()?->format(DateTimeImmutable::ATOM),
-            'sync_end'                => $this->get_sync_end()?->format(DateTimeImmutable::ATOM),
+            'sync_start'              => Chunk_DB::db()->get_sync_start($this->group_name)?->format(DateTimeImmutable::ATOM),
+            'sync_end'                => Chunk_DB::db()->get_sync_end($this->group_name)?->format(DateTimeImmutable::ATOM),
             'total_actions'           => Chunk_DB::db()->get_total_actions($this->group_name),
             'sync_duration'           => Chunk_DB::db()->get_sync_duration($this->group_name),
-            'average_action_duration' => $this->get_average_action_duration(),
+            'average_action_duration' => Chunk_DB::db()->get_average_action_duration($this->group_name),
             'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name)->setJsonExcludedFields($excludedFields),
             'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name)->setJsonExcludedFields($excludedFields),
             'actions'                 => $actions,
@@ -138,11 +65,11 @@ class Stats
     public function prepare_email_text(array $custom_data = []): string
     {
         $email_text = "--- ". __("Synchronization Report:", 'as-processor') . " ---\n";
-        $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), $this->get_sync_start()?->format('Y-m-d H:i:s')) . "\n";
-        $email_text .= sprintf(__("Sync End: %s", 'as-processor'), $this->get_sync_end()?->format('Y-m-d H:i:s')) . "\n";
+        $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), Chunk_DB::db()->get_sync_start($this->group_name)?->format('Y-m-d H:i:s')) . "\n";
+        $email_text .= sprintf(__("Sync End: %s", 'as-processor'), Chunk_DB::db()->get_sync_end($this->group_name)?->format('Y-m-d H:i:s')) . "\n";
         $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), Chunk_DB::db()->get_total_actions($this->group_name)) . "\n";
         $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), Chunk_DB::db()->get_sync_duration($this->group_name, true)) . "\n";
-        $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), $this->get_average_action_duration(true)) . "\n";
+        $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), Chunk_DB::db()->get_average_action_duration($this->group_name,true)) . "\n";
         $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_slowest_action($this->group_name)?->get_duration()) ) . "\n";
         $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_fastest_action($this->group_name)?->get_duration()) ) . "\n";
 
