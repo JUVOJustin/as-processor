@@ -143,23 +143,30 @@ class Stats
         return Helper::convert_microtime_to_datetime($end);
     }
 
-    /**
-     * Get the object as a JSON string, including custom data.
-     *
-     * @param array $custom_data Optional custom data to be included
-     * @return string
-     */
-    public function to_json(array $custom_data = []): string
+	/**
+	 * Converts the current object state and additional data to a JSON representation.
+	 *
+	 * @param array $custom_data Additional custom data to be included in the JSON output.
+	 * @param array $excludedFields Fields to be excluded from the JSON output for specific actions.
+	 * @return string The JSON representation of the object including the provided custom data and excluded fields configuration.
+	 */
+    public function to_json(array $custom_data = [], array $excludedFields = []): string
     {
+
+		$actions = Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name);
+		$actions = array_map(function (Chunk $chunk) use ($excludedFields) {
+			return $chunk->setJsonExcludedFields($excludedFields);
+		}, $actions);
+
         $data = [
             'sync_start'              => $this->get_sync_start()?->format(DateTimeImmutable::ATOM),
             'sync_end'                => $this->get_sync_end()?->format(DateTimeImmutable::ATOM),
             'total_actions'           => $this->get_total_actions(),
             'sync_duration'           => $this->get_sync_duration(),
             'average_action_duration' => $this->get_average_action_duration(),
-            'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name),
-            'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name),
-            'actions'                 => Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name),
+            'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name)->setJsonExcludedFields($excludedFields),
+            'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name)->setJsonExcludedFields($excludedFields),
+            'actions'                 => $actions,
             'custom_data'             => $custom_data
         ];
         return json_encode($data);

@@ -74,9 +74,9 @@ class Chunk_DB extends Base_DB {
 	}
 
 	/**
-	 * Retrieves one row from the database
+	 * Retrieves a single Chunk from a DB query.
 	 *
-	 * @param string $query
+	 * @param string $query The SQL Query to get the Chunk from.
 	 * @return ?Chunk
 	 */
 	public function get_chunk( string $query ): ?Chunk {
@@ -97,19 +97,18 @@ class Chunk_DB extends Base_DB {
 	 * @return Chunk|null The Chunk object representing the slowest action in the group,
 	 *                    or null if no matching action is found.
 	 */
-	public function get_slowest_action(string $group_name): ?Chunk
-	{
+	public function get_slowest_action( string $group_name ): ?Chunk {
 		$query = $this->db->prepare(
-			"SELECT *, (end - start) as duration 
-            FROM ". $this->get_table_name() ."
+			'SELECT *, (end - start) as duration 
+            FROM ' . $this->get_table_name() . '
             WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
             ORDER BY duration DESC 
-            LIMIT 1",
+            LIMIT 1',
 			$group_name
 		);
-		$chunk = $this->get_chunk($query);
+		$chunk = $this->get_chunk( $query );
 
-		if (!$chunk) {
+		if ( ! $chunk ) {
 			return null;
 		}
 
@@ -122,19 +121,18 @@ class Chunk_DB extends Base_DB {
 	 * @param string $group_name The name of the group to filter actions by.
 	 * @return Chunk|null The fastest Chunk object based on duration, or null if no matching actions are found.
 	 */
-	public function get_fastest_action(string $group_name): ?Chunk
-	{
+	public function get_fastest_action( string $group_name ): ?Chunk {
 		$query = $this->db->prepare(
-			"SELECT *, (end - start) as duration 
-            FROM ". $this->get_table_name() ."
+			'SELECT *, (end - start) as duration 
+            FROM ' . $this->get_table_name() . '
             WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
             ORDER BY duration ASC 
-            LIMIT 1",
+            LIMIT 1',
 			$group_name
 		);
-		$chunk = $this->get_chunk($query);
+		$chunk = $this->get_chunk( $query );
 
-		if (!$chunk) {
+		if ( ! $chunk ) {
 			return null;
 		}
 
@@ -144,7 +142,7 @@ class Chunk_DB extends Base_DB {
 	/**
 	 * Retrieves chunks from the database filtered by the provided group name and statuses.
 	 *
-	 * @param string $group_name The group name to filter chunks by.
+	 * @param string                             $group_name The group name to filter chunks by.
 	 * @param ProcessStatus|ProcessStatus[]|null $status Optional. A single status, an array of statuses, or null.
 	 *                                          If null, no status filter is applied.
 	 *                                          If an array, all provided statuses are included in the filter.
@@ -155,37 +153,37 @@ class Chunk_DB extends Base_DB {
 	public function get_chunks_by_status( string $group_name, ProcessStatus|array|null $status = null ): array {
 
 		// If no status is provided, don't filter or include all possible statuses
-		if (null === $status) {
+		if ( null === $status ) {
 			$query = $this->db->prepare(
 				'SELECT * FROM ' . $this->get_table_name() . ' WHERE `group` = %s',
 				$group_name
 			);
 		} else {
 			// Handle single status or multiple statuses
-			$statuses      = is_array($status) ? $status : array($status);
+			$statuses      = is_array( $status ) ? $status : array( $status );
 			$status_values = array_map(
-				static fn(ProcessStatus $status): string => $status->value,
+				static fn( ProcessStatus $status ): string => $status->value,
 				$statuses
 			);
 
-			$placeholders = array_fill(0, count($status_values), '%s');
+			$placeholders = array_fill( 0, count( $status_values ), '%s' );
 			$query        = $this->db->prepare(
 				'SELECT * FROM ' . $this->get_table_name() . '
-            WHERE `group` = %s AND status IN (' . implode(',', $placeholders) . ')',
-				array_merge(array($group_name), $status_values)
+            WHERE `group` = %s AND status IN (' . implode( ',', $placeholders ) . ')',
+				array_merge( array( $group_name ), $status_values )
 			);
 		}
 
 		// Execute the query and fetch results
-		$results = self::db()->get_results($query, ARRAY_A);
-		if (empty($results)) {
+		$results = self::db()->get_results( $query, ARRAY_A );
+		if ( empty( $results ) ) {
 			return array();
 		}
 
 		// Map results to Chunk objects
 		return array_map(
-			function ($row) {
-				return Chunk::from_array($row);
+			function ( $row ) {
+				return Chunk::from_array( $row );
 			},
 			$results
 		);

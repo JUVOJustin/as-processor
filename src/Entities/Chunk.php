@@ -9,6 +9,7 @@ namespace juvo\AS_Processor\Entities;
 
 use Exception;
 use DateTimeImmutable;
+use JsonSerializable;
 use juvo\AS_Processor\DB;
 use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\Helper;
@@ -16,7 +17,7 @@ use juvo\AS_Processor\Helper;
 /**
  * The chunk entity class
  */
-class Chunk {
+class Chunk implements JsonSerializable {
 
 	/**
 	 * ID of the chunk.
@@ -80,6 +81,13 @@ class Chunk {
 	 * @var array<object>
 	 */
 	private array $logs = array();
+
+	/**
+	 * An array that holds fields to be excluded from JSON serialization or processing.
+	 *
+	 * @var string[]
+	 */
+	private array $excluded_json_fields = array();
 
 	/**
 	 * Constructor
@@ -366,6 +374,17 @@ class Chunk {
 		return $data;
 	}
 
+	/**
+	 * Creates a Chunk instance from an array of data.
+	 *
+	 * Constructs a new Chunk object if one is not provided, and populates it using the data from the array.
+	 * Deserializes data and sets various properties on the Chunk object based on the input array.
+	 *
+	 * @param array      $data Array of data used to populate the Chunk object.
+	 * @param Chunk|null $chunk Optional Chunk instance to update. If null, a new instance will be created.
+	 *
+	 * @return Chunk
+	 */
 	public static function from_array( array $data, ?Chunk $chunk = null ): Chunk {
 
 		if ( empty( $chunk ) ) {
@@ -395,5 +414,43 @@ class Chunk {
 		}
 
 		return $chunk;
+	}
+
+	/**
+	 * Sets the fields to be excluded from JSON serialization.
+	 *
+	 * @param array $fields An array of field names to exclude during serialization.
+	 * @return Chunk
+	 */
+	public function setJsonExcludedFields( array $fields ): Chunk {
+		$this->excluded_json_fields = $fields;
+		return $this;
+	}
+
+	/**
+	 * Specify data which should be serialized to JSON.
+	 * Elements can be excluded from the JSON by using "setJsonExcludedFields()"
+	 *
+	 * @return array
+	 * @throws Exception Unparsable date.
+	 */
+	public function jsonSerialize(): array {
+		$all_data = array(
+			'chunk_id'  => $this->get_chunk_id(),
+			'action_id' => $this->get_action_id(),
+			'group'     => $this->get_group(),
+			'status'    => $this->get_status()?->value,
+			'data'      => $this->get_data(),
+			'start'     => $this->get_start() ? $this->get_start()->format( DateTimeImmutable::ATOM ) : null,
+			'end'       => $this->get_end() ? $this->get_end()->format( DateTimeImmutable::ATOM ) : null,
+			'logs'      => $this->get_logs(),
+			'duration'  => $this->get_duration(),
+		);
+
+		// Exclude the json excluded fields
+		foreach ( $this->excluded_json_fields as $field ) {
+			unset( $all_data[ $field ] );
+		}
+		return $all_data;
 	}
 }
