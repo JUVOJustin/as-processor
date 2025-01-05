@@ -190,6 +190,54 @@ class Chunk_DB extends Base_DB {
 	}
 
 	/**
+	 * Retrieves the total count of actions for a specified group name.
+	 *
+	 * @param string $group_name The group name to filter actions by.
+	 * @return int The total number of actions associated with the specified group name.
+	 */
+	public function get_total_actions( string $group_name ): int {
+		$query = $this->db->prepare(
+			'SELECT COUNT(*) FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s',
+			$group_name
+		);
+
+		return (int) $this->db->get_var( $query );
+	}
+
+	/**
+	 * Calculates the synchronization duration for a specified group.
+	 *
+	 * @param string $group_name The name of the group for which the synchronization duration is calculated.
+	 * @param bool $human_time Optional. Whether to return the duration in a human-readable format. Defaults to false.
+	 *                           If true, returns the duration as a string. If false, returns the duration as a float in seconds.
+	 * @return float|string|false Returns the synchronization duration as a float in seconds or a string in human-readable format,
+	 *                            depending on the $human_time parameter. Returns false if the start or end time is not available.
+	 */
+	public function get_sync_duration(string $group_name, bool $human_time = false): float|string|false {
+		$query = $this->db->prepare(
+			"SELECT MIN(start) as sync_start, MAX(end) as sync_end 
+            FROM ". $this->get_table_name() ."
+            WHERE `group` = %s",
+			$group_name
+		);
+
+		$result = $this->db->get_row($query);
+
+		if (empty($result->sync_start) || empty($result->sync_end)) {
+			return false;
+		}
+
+		$duration = round((float)$result->sync_end - (float)$result->sync_start, 4);
+
+		if ($human_time) {
+			return Helper::human_time_diff_microseconds(0, $duration);
+		}
+
+		return $duration;
+	}
+
+	/**
 	 * Inserts or updates a chunk record in the database.
 	 * When the chunk ID is provided, the corresponding record is updated.
 	 * Otherwise, a new chunk is inserted.

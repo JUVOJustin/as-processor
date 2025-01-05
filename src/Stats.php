@@ -27,50 +27,6 @@ class Stats
     }
 
     /**
-     * Gets the sync duration.
-     *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return float|string|false Duration or false if not available.
-     */
-    public function get_sync_duration(bool $human_time = false): float|string|false {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT MIN(start) as sync_start, MAX(end) as sync_end 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s",
-            $this->group_name
-        );
-
-        $result = Chunk_DB::db()->get_row($query);
-
-        if (empty($result->sync_start) || empty($result->sync_end)) {
-            return false;
-        }
-
-        $duration = round((float)$result->sync_end - (float)$result->sync_start, 4);
-
-        if ($human_time) {
-            return Helper::human_time_diff_microseconds(0, $duration);
-        }
-
-        return $duration;
-    }
-
-    /**
-     * Gets the total number of actions.
-     *
-     * @return int
-     */
-    public function get_total_actions(): int {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT COUNT(*) FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s",
-            $this->group_name
-        );
-
-        return (int)Chunk_DB::db()->get_var($query);
-    }
-
-    /**
      * Gets the average action duration.
      *
      * @param bool $human_time Whether to return human-readable time.
@@ -161,8 +117,8 @@ class Stats
         $data = [
             'sync_start'              => $this->get_sync_start()?->format(DateTimeImmutable::ATOM),
             'sync_end'                => $this->get_sync_end()?->format(DateTimeImmutable::ATOM),
-            'total_actions'           => $this->get_total_actions(),
-            'sync_duration'           => $this->get_sync_duration(),
+            'total_actions'           => Chunk_DB::db()->get_total_actions($this->group_name),
+            'sync_duration'           => Chunk_DB::db()->get_sync_duration($this->group_name),
             'average_action_duration' => $this->get_average_action_duration(),
             'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name)->setJsonExcludedFields($excludedFields),
             'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name)->setJsonExcludedFields($excludedFields),
@@ -172,19 +128,20 @@ class Stats
         return json_encode($data);
     }
 
-    /**
-     * Prepare an email text report, including custom data.
-     *
-     * @param array $custom_data Optional custom data to be included
-     * @return string
-     */
+	/**
+	 * Prepare an email text report, including custom data.
+	 *
+	 * @param array $custom_data Optional custom data to be included
+	 * @return string
+	 * @throws \Exception Unparsable Date.
+	 */
     public function prepare_email_text(array $custom_data = []): string
     {
         $email_text = "--- ". __("Synchronization Report:", 'as-processor') . " ---\n";
         $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), $this->get_sync_start()?->format('Y-m-d H:i:s')) . "\n";
         $email_text .= sprintf(__("Sync End: %s", 'as-processor'), $this->get_sync_end()?->format('Y-m-d H:i:s')) . "\n";
-        $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), $this->get_total_actions()) . "\n";
-        $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), $this->get_sync_duration(true)) . "\n";
+        $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), Chunk_DB::db()->get_total_actions($this->group_name)) . "\n";
+        $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), Chunk_DB::db()->get_sync_duration($this->group_name, true)) . "\n";
         $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), $this->get_average_action_duration(true)) . "\n";
         $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_slowest_action($this->group_name)?->get_duration()) ) . "\n";
         $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_fastest_action($this->group_name)?->get_duration()) ) . "\n";
@@ -220,4 +177,25 @@ class Stats
 
         return $email_text;
     }
+
+	/**
+	 * Sends an email report.
+	 *
+	 * @param string $to The recipient's email address. Defaults to admin mail.
+	 * @param string $subject Optional. Subject of the email.
+	 * @param array $custom_data Custom data to include in the email. Defaults to an empty array.
+	 * @return void
+	 * @throws \Exception Unparsable Date.
+	 */
+	public function send_mail_report(string $to = "", string $subject = "", array $custom_data = []): void
+	{
+
+		$message = $this->prepare_email_text($custom_data);
+		$mailarray = apply_filters('asp/stats/remail_report', [
+			'to'      => $to ?? get_option('admin_email'),
+			'subject' => $subject ?? sprintf(__('[%s] Report of sync group %s', 'sinnewerk'), get_bloginfo('name'), $this->group_name),
+			'message' => $message
+		]);
+		wp_mail($mailarray['to'], $mailarray['subject'], $mailarray['message']);
+	}
 }
