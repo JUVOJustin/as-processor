@@ -9,12 +9,15 @@ namespace juvo\AS_Processor\Entities;
 
 use Exception;
 use DateTimeImmutable;
+use JsonSerializable;
 use juvo\AS_Processor\DB;
+use juvo\AS_Processor\DB\Chunk_DB;
+use juvo\AS_Processor\Helper;
 
 /**
  * The chunk entity class
  */
-class Chunk {
+class Chunk implements JsonSerializable {
 
 	/**
 	 * ID of the chunk.
@@ -80,6 +83,13 @@ class Chunk {
 	private array $logs = array();
 
 	/**
+	 * An array that holds fields to be excluded from JSON serialization or processing.
+	 *
+	 * @var string[]
+	 */
+	private array $excluded_json_fields = array();
+
+	/**
 	 * Constructor
 	 *
 	 * @param int|null $chunk_id The chunk ID.
@@ -99,10 +109,8 @@ class Chunk {
 			return;
 		}
 
-		DB\Chunk_DB::db()->fetch( $this );
-
-		// Fetch associated logs
-		$this->logs = DB\Chunk_DB::db()->get_logs( $this->action_id );
+		$row = Chunk_DB::db()->get_row_by_id( $this->chunk_id );
+		self::from_array( $row, $this );
 
 		$this->is_data_fetched = true;
 	}
@@ -284,7 +292,7 @@ class Chunk {
 	/**
 	 * Sets the end date and time.
 	 *
-	 * @param DateTimeImmutable $date The end date and time.
+	 * @param ?DateTimeImmutable $date The end date and time.
 	 * @return void
 	 */
 	public function set_end( ?DateTimeImmutable $date = null ): void {
@@ -294,6 +302,16 @@ class Chunk {
 		}
 
 		$this->end = $date;
+	}
+
+	/**
+	 * Sets the logs.
+	 *
+	 * @param array $logs An array of log data.
+	 * @return void
+	 */
+	private function set_logs( array $logs ): void {
+		$this->logs = $logs;
 	}
 
 	/**
@@ -354,5 +372,85 @@ class Chunk {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Creates a Chunk instance from an array of data.
+	 *
+	 * Constructs a new Chunk object if one is not provided, and populates it using the data from the array.
+	 * Deserializes data and sets various properties on the Chunk object based on the input array.
+	 *
+	 * @param array      $data Array of data used to populate the Chunk object.
+	 * @param Chunk|null $chunk Optional Chunk instance to update. If null, a new instance will be created.
+	 *
+	 * @return Chunk
+	 */
+	public static function from_array( array $data, ?Chunk $chunk = null ): Chunk {
+
+		if ( empty( $chunk ) ) {
+			$chunk = new Chunk( $data['id'] ?? null );
+		}
+
+		// Check for each value before calling the corresponding setter
+		if ( ! empty( $data['data'] ) ) {
+			$chunk->set_data( unserialize( $data['data'] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
+		}
+
+		if ( ! empty( $data['action_id'] ) ) {
+			$chunk->set_action_id( (int) $data['action_id'] );
+			$chunk->set_logs( Chunk_DB::db()->get_logs( $data['action_id'] ) );
+		}
+
+		if ( ! empty( $data['status'] ) ) {
+			$chunk->set_status( ProcessStatus::from( $data['status'] ) );
+		}
+
+		if ( ! empty( $data['start'] ) ) {
+			$chunk->set_start( Helper::convert_microtime_to_datetime( $data['start'] ) );
+		}
+
+		if ( ! empty( $data['end'] ) ) {
+			$chunk->set_end( Helper::convert_microtime_to_datetime( $data['end'] ) );
+		}
+
+		return $chunk;
+	}
+
+	/**
+	 * Sets the fields to be excluded from JSON serialization.
+	 *
+	 * @param array $fields An array of field names to exclude during serialization.
+	 * @return Chunk
+	 */
+	public function setJsonExcludedFields( array $fields ): Chunk {
+		$this->excluded_json_fields = $fields;
+		return $this;
+	}
+
+	/**
+	 * Specify data which should be serialized to JSON.
+	 * Elements can be excluded from the JSON by using "setJsonExcludedFields()"
+	 *
+	 * @return array
+	 * @throws Exception Unparsable date.
+	 */
+	public function jsonSerialize(): array {
+		$all_data = array(
+			'chunk_id'  => $this->get_chunk_id(),
+			'action_id' => $this->get_action_id(),
+			'group'     => $this->get_group(),
+			'status'    => $this->get_status()?->value,
+			'data'      => $this->get_data(),
+			'start'     => $this->get_start() ? $this->get_start()->format( 'Y-m-d\TH:i:s.uP' ) : null,
+			'end'       => $this->get_end() ? $this->get_end()->format( 'Y-m-d\TH:i:s.uP' ) : null,
+			'logs'      => $this->get_logs(),
+			'duration'  => $this->get_duration(),
+		);
+
+		// Exclude the json excluded fields
+		foreach ( $this->excluded_json_fields as $field ) {
+			unset( $all_data[ $field ] );
+		}
+		return $all_data;
 	}
 }

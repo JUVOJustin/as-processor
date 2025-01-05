@@ -7,6 +7,7 @@
 
 namespace juvo\AS_Processor\DB;
 
+use DateTimeImmutable;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
 use juvo\AS_Processor\Helper;
@@ -57,29 +58,264 @@ class Chunk_DB extends Base_DB {
 	}
 
 	/**
-	 * Fetches data for a given chunk and populates its properties.
+	 * Retrieve a row from the database by its ID.
 	 *
-	 * @param Chunk $chunk The chunk object for which data is to be fetched.
-	 *
-	 * @return void
+	 * @param int $id The ID of the row to retrieve.
+	 * @return bool|array Returns an array representing the row if found, or false if the row does not exist.
 	 */
-	public function fetch( Chunk $chunk ): void {
-
-		$data_query = $this->db->prepare(
-			"SELECT * FROM {$this->get_table_name()} WHERE id = %d",
-			$chunk->get_chunk_id()
+	public function get_row_by_id( int $id ): bool|array {
+		$row = $this->db->get_row(
+			$this->db->prepare(
+				"SELECT * FROM {$this->get_table_name()} WHERE id = %d",
+				$id
+			),
+			ARRAY_A
 		);
-		$row        = $this->db->get_row( $data_query, ARRAY_A );
+		return $row ?: false;
+	}
+
+	/**
+	 * Retrieves a single Chunk from a DB query.
+	 *
+	 * @param string $query The SQL Query to get the Chunk from.
+	 * @return ?Chunk
+	 */
+	public function get_chunk( string $query ): ?Chunk {
+
+		$row = $this->db->get_row( $query, ARRAY_A );
 
 		if ( ! $row ) {
-			return; // No data found
+			return null;
 		}
 
-		$chunk->set_data( unserialize( $row['data'] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
-		$chunk->set_action_id( intval( $row['action_id'] ) );
-		$chunk->set_status( ProcessStatus::from( $row['status'] ) );
-		$chunk->set_start( Helper::convert_microtime_to_datetime( $row['start'] ) );
-		$chunk->set_end( Helper::convert_microtime_to_datetime( $row['end'] ) );
+		return Chunk::from_array( $row );
+	}
+
+	/**
+	 * Retrieves the action with the longest execution duration from the specified group.
+	 *
+	 * @param string $group_name The name of the group to retrieve the slowest action from.
+	 * @return Chunk|null The Chunk object representing the slowest action in the group,
+	 *                    or null if no matching action is found.
+	 */
+	public function get_slowest_action( string $group_name ): ?Chunk {
+		$query = $this->db->prepare(
+			'SELECT *, (end - start) as duration 
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
+            ORDER BY duration DESC 
+            LIMIT 1',
+			$group_name
+		);
+		$chunk = $this->get_chunk( $query );
+
+		if ( ! $chunk ) {
+			return null;
+		}
+
+		return $chunk;
+	}
+
+	/**
+	 * Retrieves the fastest action (chunk) for the specified group based on execution duration.
+	 *
+	 * @param string $group_name The name of the group to filter actions by.
+	 * @return Chunk|null The fastest Chunk object based on duration, or null if no matching actions are found.
+	 */
+	public function get_fastest_action( string $group_name ): ?Chunk {
+		$query = $this->db->prepare(
+			'SELECT *, (end - start) as duration 
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
+            ORDER BY duration ASC 
+            LIMIT 1',
+			$group_name
+		);
+		$chunk = $this->get_chunk( $query );
+
+		if ( ! $chunk ) {
+			return null;
+		}
+
+		return $chunk;
+	}
+
+	/**
+	 * Retrieves chunks from the database filtered by the provided group name and statuses.
+	 *
+	 * @param string                             $group_name The group name to filter chunks by.
+	 * @param ProcessStatus|ProcessStatus[]|null $status Optional. A single status, an array of statuses, or null.
+	 *                                          If null, no status filter is applied.
+	 *                                          If an array, all provided statuses are included in the filter.
+	 *                                          If a single status, only chunks matching that status are returned.
+	 * @return array An array of Chunk objects matching the specified group name and status conditions.
+	 *               Returns an empty array if no results are found.
+	 */
+	public function get_chunks_by_status( string $group_name, ProcessStatus|array|null $status = null ): array {
+
+		// If no status is provided, don't filter or include all possible statuses
+		if ( null === $status ) {
+			$query = $this->db->prepare(
+				'SELECT * FROM ' . $this->get_table_name() . ' WHERE `group` = %s',
+				$group_name
+			);
+		} else {
+			// Handle single status or multiple statuses
+			$statuses      = is_array( $status ) ? $status : array( $status );
+			$status_values = array_map(
+				static fn( ProcessStatus $status ): string => $status->value,
+				$statuses
+			);
+
+			$placeholders = array_fill( 0, count( $status_values ), '%s' );
+			$query        = $this->db->prepare(
+				'SELECT * FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s AND status IN (' . implode( ',', $placeholders ) . ')',
+				array_merge( array( $group_name ), $status_values )
+			);
+		}
+
+		// Execute the query and fetch results
+		$results = self::db()->get_results( $query, ARRAY_A );
+		if ( empty( $results ) ) {
+			return array();
+		}
+
+		// Map results to Chunk objects
+		return array_map(
+			function ( $row ) {
+				return Chunk::from_array( $row );
+			},
+			$results
+		);
+	}
+
+	/**
+	 * Retrieves the total count of actions for a specified group name.
+	 *
+	 * @param string $group_name The group name to filter actions by.
+	 * @return int The total number of actions associated with the specified group name.
+	 */
+	public function get_total_actions( string $group_name ): int {
+		$query = $this->db->prepare(
+			'SELECT COUNT(*) FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s',
+			$group_name
+		);
+
+		return (int) $this->db->get_var( $query );
+	}
+
+	/**
+	 * Calculates the synchronization duration for a specified group.
+	 *
+	 * @param string $group_name The name of the group for which the synchronization duration is calculated.
+	 * @param bool   $human_time Optional. Whether to return the duration in a human-readable format. Defaults to false.
+	 *                             If true, returns the duration as a string. If false, returns the duration as a float in seconds.
+	 * @return float|string|false Returns the synchronization duration as a float in seconds or a string in human-readable format,
+	 *                            depending on the $human_time parameter. Returns false if the start or end time is not available.
+	 */
+	public function get_sync_duration( string $group_name, bool $human_time = false ): float|string|false {
+		$query = $this->db->prepare(
+			'SELECT MIN(start) as sync_start, MAX(end) as sync_end 
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s',
+			$group_name
+		);
+
+		$result = $this->db->get_row( $query );
+
+		if ( empty( $result->sync_start ) || empty( $result->sync_end ) ) {
+			return false;
+		}
+
+		$duration = round( (float) $result->sync_end - (float) $result->sync_start, 4 );
+
+		if ( $human_time ) {
+			return Helper::human_time_diff_microseconds( 0, $duration );
+		}
+
+		return $duration;
+	}
+
+	/**
+	 * Retrieves the earliest sync start time for the specified group.
+	 *
+	 * @param string $group_name The name of the group to retrieve the sync start time for.
+	 *                           Used to filter the records in the database.
+	 * @return DateTimeImmutable|null The earliest sync start time as a DateTimeImmutable object.
+	 *                                 Returns null if no valid start time is found.
+	 */
+	public function get_sync_start( string $group_name ): ?DateTimeImmutable {
+		$query = $this->db->prepare(
+			'SELECT start
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s
+            AND start IS NOT NULL
+            ORDER BY start ASC
+            LIMIT 1',
+			$group_name
+		);
+
+		$start = $this->db->get_var( $query );
+
+		if ( empty( $start ) ) {
+			return null;
+		}
+
+		return Helper::convert_microtime_to_datetime( $start );
+	}
+
+	/**
+	 * Retrieves the most recent synchronization end time for the specified group.
+	 *
+	 * @param string $group_name The group name to retrieve the most recent synchronization end time for.
+	 *
+	 * @return DateTimeImmutable|null The most recent end time as a DateTimeImmutable object, or null if no end time is found.
+	 */
+	public function get_sync_end( string $group_name ): ?DateTimeImmutable {
+		$query = $this->db->prepare(
+			'SELECT end
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s
+            AND end IS NOT NULL
+            ORDER BY end DESC
+            LIMIT 1',
+			$group_name
+		);
+
+		$end = $this->db->get_var( $query );
+
+		if ( empty( $end ) ) {
+			return null;
+		}
+
+		return Helper::convert_microtime_to_datetime( $end );
+	}
+
+	/**
+	 * Calculates the average duration of actions for the specified group.
+	 *
+	 * @param string $group_name The name of the group to calculate the average action duration for.
+	 * @param bool   $human_time Optional. Whether to return the duration as a human-readable string.
+	 *                             If true, the duration is formatted for readability.
+	 *                             If false, the duration is returned as a float representing microseconds.
+	 * @return float|string The average action duration. Returns a float in microseconds if $human_time is false,
+	 *                      or a human-readable string if $human_time is true.
+	 */
+	public function get_average_action_duration( string $group_name, bool $human_time = false ): float|string {
+		$query = $this->db->prepare(
+			'SELECT AVG(end - start) as avg_duration 
+            FROM ' . $this->get_table_name() . '
+            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL',
+			$group_name
+		);
+
+		$average = (float) $this->db->get_var( $query );
+
+		return $human_time ?
+			Helper::human_time_diff_microseconds( 0, $average ) :
+			$average;
 	}
 
 	/**

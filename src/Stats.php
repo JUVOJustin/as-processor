@@ -26,299 +26,52 @@ class Stats
         $this->group_name = $group_name;
     }
 
-    /**
-     * Gets the sync duration.
-     *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return float|string|false Duration or false if not available.
-     */
-    public function get_sync_duration(bool $human_time = false): float|string|false {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT MIN(start) as sync_start, MAX(end) as sync_end 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s",
-            $this->group_name
-        );
-
-        $result = Chunk_DB::db()->get_row($query);
-
-        if (empty($result->sync_start) || empty($result->sync_end)) {
-            return false;
-        }
-
-        $duration = round((float)$result->sync_end - (float)$result->sync_start, 4);
-
-        if ($human_time) {
-            return Helper::human_time_diff_microseconds(0, $duration);
-        }
-
-        return $duration;
-    }
-
-    /**
-     * Gets the total number of actions.
-     *
-     * @return int
-     */
-    public function get_total_actions(): int {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT COUNT(*) FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s",
-            $this->group_name
-        );
-
-        return (int)Chunk_DB::db()->get_var($query);
-    }
-
-    /**
-     * Gets actions filtered by status.
-     *
-     * @param ProcessStatus|array<ProcessStatus> $status Status to filter by.
-     * @param bool $include_durations Whether to include durations.
-     * @param bool $human_time Whether to return human-readable time.
-     * @return array
-     */
-    public function get_actions_by_status(ProcessStatus|array $status, bool $include_durations = false, bool $human_time = false): array
+	/**
+	 * Converts the current object state and additional data to a JSON representation.
+	 *
+	 * @param array $custom_data Additional custom data to be included in the JSON output.
+	 * @param array $excludedFields Fields to be excluded from the JSON output for specific actions.
+	 * @return string The JSON representation of the object including the provided custom data and excluded fields configuration.
+	 */
+    public function to_json(array $custom_data = [], array $excludedFields = []): string
     {
-        $statuses = is_array($status) ? $status : [$status];
-        $status_values = array_map(static fn(ProcessStatus $status): string => $status->value, $statuses);
 
-        $placeholders = array_fill(0, count($status_values), '%s');
-        $query = Chunk_DB::db()->prepare(
-            "SELECT * FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND status IN (" . implode(',', $placeholders) . ")",
-            array_merge([$this->group_name], $status_values)
-        );
+		$actions = Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name);
+		$actions = array_map(function (Chunk $chunk) use ($excludedFields) {
+			return $chunk->setJsonExcludedFields($excludedFields);
+		}, $actions);
 
-        $results = Chunk_DB::db()->get_results($query, ARRAY_A);
-
-        if ($include_durations) {
-            foreach ($results as &$action) {
-                if (!empty($action['start']) && !empty($action['end'])) {
-                    $duration = round((float)$action['end'] - (float)$action['start'], 4);
-                    $action['duration'] = $human_time
-                        ? Helper::human_time_diff_microseconds(0, $duration)
-                        : $duration;
-                }
-            }
-        }
-
-        return $results;
-    }
-
-    /**
-     * Gets the average action duration.
-     *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return float|string
-     */
-    public function get_average_action_duration(bool $human_time = false): float|string {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT AVG(end - start) as avg_duration 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL",
-            $this->group_name
-        );
-
-        $average = (float)Chunk_DB::db()->get_var($query);
-
-        return $human_time ?
-            Helper::human_time_diff_microseconds(0, $average) :
-            $average;
-    }
-
-    /**
-     * Gets the slowest action.
-     *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return array|null
-     */
-    public function get_slowest_action(bool $human_time = false): ?array {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT *, (end - start) as duration 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
-            ORDER BY duration DESC 
-            LIMIT 1",
-            $this->group_name
-        );
-
-        $result = Chunk_DB::db()->get_row($query, ARRAY_A);
-
-        if (!$result) {
-            return null;
-        }
-
-        $duration = round((float)$result['end'] - (float)$result['start'], 4);
-
-        return [
-            'id' => $result['id'],
-            'duration' => $human_time ?
-                Helper::human_time_diff_microseconds(0, $duration) :
-                $duration
-        ];
-    }
-
-    /**
-     * Gets the fastest action.
-     *
-     * @param bool $human_time Whether to return human-readable time.
-     * @return array|null
-     */
-    public function get_fastest_action(bool $human_time = false): ?array {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT *, (end - start) as duration 
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s AND start IS NOT NULL AND end IS NOT NULL 
-            ORDER BY duration ASC 
-            LIMIT 1",
-            $this->group_name
-        );
-
-        $result = Chunk_DB::db()->get_row($query, ARRAY_A);
-
-        if (!$result) {
-            return null;
-        }
-
-        $duration = round((float)$result['end'] - (float)$result['start'], 4);
-
-        return [
-            'id' => $result['id'],
-            'duration' => $human_time ?
-                Helper::human_time_diff_microseconds(0, $duration) :
-                $duration
-        ];
-    }
-
-    /**
-     * Gets the sync start time.
-     *
-     * @return DateTimeImmutable|null
-     */
-    public function get_sync_start(): ?DateTimeImmutable
-    {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT start
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s
-            AND start IS NOT NULL
-            ORDER BY start ASC
-            LIMIT 1",
-            $this->group_name
-        );
-        
-        $start = Chunk_DB::db()->get_var($query);
-        
-        if (empty($start)) {
-            return null;
-        }
-        
-        return Helper::convert_microtime_to_datetime($start);
-    }
-    
-    /**
-     * Gets the sync end time.
-     *
-     * @return DateTimeImmutable|null
-     */
-    public function get_sync_end(): ?DateTimeImmutable
-    {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT end
-            FROM ". Chunk_DB::db()->get_table_name() ."
-            WHERE `group` = %s
-            AND end IS NOT NULL
-            ORDER BY end DESC
-            LIMIT 1",
-            $this->group_name
-        );
-        
-        $end = Chunk_DB::db()->get_var($query);
-        
-        if (empty($end)) {
-            return null;
-        }
-        
-        return Helper::convert_microtime_to_datetime($end);
-    }
-
-    /**
-     * Gets all actions for the current sync group.
-     *
-     * @return array<int, array{
-     *     id: int,
-     *     name: string,
-     *     group: string,
-     *     status: ProcessStatus
-     * }>
-     */
-    public function get_actions(): array
-    {
-        $query = Chunk_DB::db()->prepare(
-            "SELECT `id`, `name`, `group`, `status` 
-            FROM ". Chunk_DB::db()->get_table_name() ." 
-            WHERE `group` = %s",
-            $this->group_name
-        );
-
-        $results = Chunk_DB::db()->get_results($query, ARRAY_A);
-
-        if (!is_array($results)) {
-            return [];
-        }
-
-        return array_map(
-            static function(array $row): array {
-                return [
-                    'id' => (int)$row['id'],
-                    'name' => $row['name'],
-                    'group' => $row['group'],
-                    'status' => ProcessStatus::from($row['status'])
-                ];
-            },
-            $results
-        );
-    }
-
-    /**
-     * Get the object as a JSON string, including custom data.
-     *
-     * @param array $custom_data Optional custom data to be included
-     * @return string
-     */
-    public function to_json(array $custom_data = []): string
-    {
         $data = [
-            'sync_start'              => $this->get_sync_start()?->format(DateTimeImmutable::ATOM),
-            'sync_end'                => $this->get_sync_end()?->format(DateTimeImmutable::ATOM),
-            'total_actions'           => $this->get_total_actions(),
-            'sync_duration'           => $this->get_sync_duration(),
-            'average_action_duration' => $this->get_average_action_duration(),
-            'slowest_action'          => $this->get_slowest_action(),
-            'fastest_action'          => $this->get_fastest_action(),
-            'actions'                 => $this->get_actions(),
+            'sync_start'              => Chunk_DB::db()->get_sync_start($this->group_name)?->format(DateTimeImmutable::ATOM),
+            'sync_end'                => Chunk_DB::db()->get_sync_end($this->group_name)?->format(DateTimeImmutable::ATOM),
+            'total_actions'           => Chunk_DB::db()->get_total_actions($this->group_name),
+            'sync_duration'           => Chunk_DB::db()->get_sync_duration($this->group_name),
+            'average_action_duration' => Chunk_DB::db()->get_average_action_duration($this->group_name),
+            'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name)->setJsonExcludedFields($excludedFields),
+            'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name)->setJsonExcludedFields($excludedFields),
+            'actions'                 => $actions,
             'custom_data'             => $custom_data
         ];
         return json_encode($data);
     }
 
-    /**
-     * Prepare an email text report, including custom data.
-     *
-     * @param array $custom_data Optional custom data to be included
-     * @return string
-     */
+	/**
+	 * Prepare an email text report, including custom data.
+	 *
+	 * @param array $custom_data Optional custom data to be included
+	 * @return string
+	 * @throws \Exception Unparsable Date.
+	 */
     public function prepare_email_text(array $custom_data = []): string
     {
         $email_text = "--- ". __("Synchronization Report:", 'as-processor') . " ---\n";
-        $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), $this->get_sync_start()?->format('Y-m-d H:i:s')) . "\n";
-        $email_text .= sprintf(__("Sync End: %s", 'as-processor'), $this->get_sync_end()?->format('Y-m-d H:i:s')) . "\n";
-        $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), $this->get_total_actions()) . "\n";
-        $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), $this->get_sync_duration(true)) . "\n";
-        $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), $this->get_average_action_duration(true)) . "\n";
-        $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), $this->get_slowest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
-        $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), $this->get_fastest_action(true)['duration'] ?? __('N/A', 'as-processor')) . "\n";
+        $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), Chunk_DB::db()->get_sync_start($this->group_name)?->format("Y-m-d H:i:s.u T")) . "\n";
+        $email_text .= sprintf(__("Sync End: %s", 'as-processor'), Chunk_DB::db()->get_sync_end($this->group_name)?->format("Y-m-d H:i:s.u T")) . "\n";
+        $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), Chunk_DB::db()->get_total_actions($this->group_name)) . "\n";
+        $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), Chunk_DB::db()->get_sync_duration($this->group_name, true)) . "\n";
+        $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), Chunk_DB::db()->get_average_action_duration($this->group_name,true)) . "\n";
+        $email_text .= sprintf(__("Slowest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_slowest_action($this->group_name)?->get_duration()) ) . "\n";
+        $email_text .= sprintf(__("Fastest Action Duration: %s", 'as-processor'), Helper::human_time_diff_microseconds(0, Chunk_DB::db()->get_fastest_action($this->group_name)?->get_duration()) ) . "\n";
 
 		// Append custom data if available
 		if (!empty($custom_data)) {
@@ -329,16 +82,16 @@ class Stats
 		}
 
         // Failed actions
-        $failed_actions = $this->get_actions_by_status(ProcessStatus::FAILED);
-        if (!empty($failed_actions)) {
+		$failed_actions = Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name, status: ProcessStatus::FAILED);
+		if (!empty($failed_actions)) {
             $email_text .= "\n-- " . __("Failed Actions Detail:", 'as-processor') . " --\n";
-            foreach ($failed_actions as $action) {
-                $chunk = new Chunk( $action['id'] );
+            foreach ($failed_actions as $chunk) {
                 $email_text .= sprintf(__("Action ID: %s", 'as-processor'), $chunk->get_action_id()) . "\n";
                 $email_text .= sprintf(__("Status: %s", 'as-processor'), $chunk->get_status()->value) . "\n";
-                $email_text .= sprintf(__("Start: %s", 'as-processor'), $chunk->get_start()->format('Y-m-d H:i:s')) . "\n";
-                $email_text .= sprintf(__("End: %s", 'as-processor'), $chunk->get_end()->format('Y-m-d H:i:s')) . "\n";
-                if ($action['status'] === 'failed') {
+                $email_text .= sprintf(__("Start: %s", 'as-processor'), $chunk->get_start()->format("Y-m-d H:i:s.u T")) . "\n";
+                $email_text .= sprintf(__("End: %s", 'as-processor'), $chunk->get_end()->format("Y-m-d H:i:s.u T")) . "\n";
+
+				if ($chunk->get_status()->value === 'failed') {
                     $email_text .= __("Log Messages:", 'as-processor') . "\n";
                     foreach ( $chunk->get_logs() as $message ) {
 						$decoded_message = htmlspecialchars_decode($message, ENT_QUOTES);
@@ -351,4 +104,25 @@ class Stats
 
         return $email_text;
     }
+
+	/**
+	 * Sends an email report.
+	 *
+	 * @param string $to The recipient's email address. Defaults to admin mail.
+	 * @param string $subject Optional. Subject of the email.
+	 * @param array $custom_data Custom data to include in the email. Defaults to an empty array.
+	 * @return void
+	 * @throws \Exception Unparsable Date.
+	 */
+	public function send_mail_report(string $to = "", string $subject = "", array $custom_data = []): void
+	{
+
+		$message = $this->prepare_email_text($custom_data);
+		$mailarray = apply_filters('asp/stats/remail_report', [
+			'to'      => $to ?: get_option('admin_email'),
+			'subject' => $subject ?: sprintf(__('[%s] Report of sync group %s', 'sinnewerk'), get_bloginfo('name'), $this->group_name),
+			'message' => $message
+		]);
+		wp_mail($mailarray['to'], $mailarray['subject'], $mailarray['message']);
+	}
 }
