@@ -441,8 +441,8 @@ class Chunk implements JsonSerializable {
 			'group'     => $this->get_group(),
 			'status'    => $this->get_status()?->value,
 			'data'      => $this->get_data(),
-			'start'     => $this->get_start() ? $this->get_start()->format( DateTimeImmutable::ATOM ) : null,
-			'end'       => $this->get_end() ? $this->get_end()->format( DateTimeImmutable::ATOM ) : null,
+			'start'     => $this->get_start() ? $this->get_start()->format( "Y-m-d\TH:i:s.uP" ) : null,
+			'end'       => $this->get_end() ? $this->get_end()->format( "Y-m-d\TH:i:s.uP" ) : null,
 			'logs'      => $this->get_logs(),
 			'duration'  => $this->get_duration(),
 		);

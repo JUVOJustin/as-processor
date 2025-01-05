@@ -65,8 +65,8 @@ class Stats
     public function prepare_email_text(array $custom_data = []): string
     {
         $email_text = "--- ". __("Synchronization Report:", 'as-processor') . " ---\n";
-        $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), Chunk_DB::db()->get_sync_start($this->group_name)?->format('Y-m-d H:i:s')) . "\n";
-        $email_text .= sprintf(__("Sync End: %s", 'as-processor'), Chunk_DB::db()->get_sync_end($this->group_name)?->format('Y-m-d H:i:s')) . "\n";
+        $email_text .= sprintf(__("Sync Start: %s", 'as-processor'), Chunk_DB::db()->get_sync_start($this->group_name)?->format("Y-m-d H:i:s.u T")) . "\n";
+        $email_text .= sprintf(__("Sync End: %s", 'as-processor'), Chunk_DB::db()->get_sync_end($this->group_name)?->format("Y-m-d H:i:s.u T")) . "\n";
         $email_text .= sprintf(__("Total Actions: %d", 'as-processor'), Chunk_DB::db()->get_total_actions($this->group_name)) . "\n";
         $email_text .= sprintf(__("Sync Duration: %s", 'as-processor'), Chunk_DB::db()->get_sync_duration($this->group_name, true)) . "\n";
         $email_text .= sprintf(__("Average Action Duration: %s", 'as-processor'), Chunk_DB::db()->get_average_action_duration($this->group_name,true)) . "\n";
@@ -88,8 +88,8 @@ class Stats
             foreach ($failed_actions as $chunk) {
                 $email_text .= sprintf(__("Action ID: %s", 'as-processor'), $chunk->get_action_id()) . "\n";
                 $email_text .= sprintf(__("Status: %s", 'as-processor'), $chunk->get_status()->value) . "\n";
-                $email_text .= sprintf(__("Start: %s", 'as-processor'), $chunk->get_start()->format('Y-m-d H:i:s')) . "\n";
-                $email_text .= sprintf(__("End: %s", 'as-processor'), $chunk->get_end()->format('Y-m-d H:i:s')) . "\n";
+                $email_text .= sprintf(__("Start: %s", 'as-processor'), $chunk->get_start()->format("Y-m-d H:i:s.u T")) . "\n";
+                $email_text .= sprintf(__("End: %s", 'as-processor'), $chunk->get_end()->format("Y-m-d H:i:s.u T")) . "\n";
 
 				if ($chunk->get_status()->value === 'failed') {
                     $email_text .= __("Log Messages:", 'as-processor') . "\n";
@@ -119,8 +119,8 @@ class Stats
 
 		$message = $this->prepare_email_text($custom_data);
 		$mailarray = apply_filters('asp/stats/remail_report', [
-			'to'      => $to ?? get_option('admin_email'),
-			'subject' => $subject ?? sprintf(__('[%s] Report of sync group %s', 'sinnewerk'), get_bloginfo('name'), $this->group_name),
+			'to'      => $to ?: get_option('admin_email'),
+			'subject' => $subject ?: sprintf(__('[%s] Report of sync group %s', 'sinnewerk'), get_bloginfo('name'), $this->group_name),
 			'message' => $message
 		]);
 		wp_mail($mailarray['to'], $mailarray['subject'], $mailarray['message']);
