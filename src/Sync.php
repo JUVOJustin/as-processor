@@ -12,6 +12,8 @@ use ActionScheduler;
 use ActionScheduler_Action;
 use ActionScheduler_Store;
 use Exception;
+use juvo\AS_Processor\DB\Chunk_DB;
+use juvo\AS_Processor\DB\Data_DB;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
 
@@ -74,20 +76,11 @@ abstract class Sync implements Syncable {
 			add_action( $this->get_sync_name() . '/fail', array( $this, 'on_fail' ), 10, 3 );
 		}
 
-		// Hooks for chunk cleanup
+		// Hook Sync DB Cleanup
 		add_action(
 			'init',
 			function () {
-				$this->schedule_chunk_cleanup();
-			}
-		);
-		add_action( 'asp/chunks/cleanup', array( $this, 'cleanup_chunk_data' ) );
-
-		// Hook Sync Data Cleanup
-		add_action(
-			'init',
-			function () {
-				if ( as_has_scheduled_action( 'asp/sync_data/cleanup' ) ) {
+				if ( as_has_scheduled_action( 'asp/cleanup' ) ) {
 					return;
 				}
 
@@ -95,11 +88,17 @@ abstract class Sync implements Syncable {
 				as_schedule_cron_action(
 					time(),
 					'0 0 * * *',
-					'asp/sync_data/cleanup'
+					'asp/cleanup'
 				);
 			}
 		);
-		add_action( 'asp/sync_data/cleanup', array( $this, 'cleanup_sync_data' ) );
+		add_action(
+			'asp/cleanup',
+			function () {
+				Chunk_DB::db()->cleanup();
+				Data_DB::db()->delete_expired_data();
+			}
+		);
 	}
 
 	/**
