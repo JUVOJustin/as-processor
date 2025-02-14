@@ -32,7 +32,7 @@ trait Chunker {
 		
 		// update chunk counter
 		if ( property_exists( $this, 'chunk_counter' ) ) {
-			$this->chunks_count = DB\Chunk_DB::db()->get_total_actions( $this->get_sync_group_name() );
+			$this->chunk_counter = DB\Chunk_DB::db()->get_total_actions( $this->get_sync_group_name() );
 		}
 
 		// check if we have a chunk limit
