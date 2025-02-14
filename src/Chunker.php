@@ -29,14 +29,20 @@ trait Chunker {
 	 * @throws Exception When chunk data insertion fails.
 	 */
 	protected function schedule_chunk( mixed $chunk_data ): void {
+		
 		// update chunk counter
 		if ( property_exists( $this, 'chunk_counter' ) ) {
-			$this->chunk_counter += 1;
+			$this->chunks_count = DB\Chunk_DB::db()->get_total_actions( $this->get_sync_group_name() );
 		}
 
 		// check if we have a chunk limit
-		if ( property_exists( $this, 'chunk_limit' ) && property_exists( $this, 'chunk_counter' ) && 0 !== $this->chunk_limit && $this->chunk_counter > $this->chunk_limit ) {
-			return;
+		if (
+		    property_exists( $this, 'chunk_limit' )
+		    && property_exists( $this, 'chunk_counter' )
+		    && 0 !== $this->chunk_limit
+		    && $this->chunk_counter >= $this->chunk_limit
+		) {
+		    return;
 		}
 
 		// convert to array if it's an iterator
