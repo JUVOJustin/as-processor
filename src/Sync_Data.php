@@ -104,8 +104,8 @@ trait Sync_Data {
 		$success = Data_DB::db()->replace( $this->get_sync_data_name() . '_' . $key, $updates, $expiration );
 		if ( ! $success ) {
 			throw new Exception(
-			/* translators: 1: The key name of the sync data trying to update. */
-				sprintf( esc_attr__( 'Failed to update sync data for key %s', 'as-processor' ), esc_attr( $key ) )
+			/* translators: 1: The key name of the sync data trying to update., 2: The last db error. */
+				sprintf( esc_attr__( 'Failed to update sync data for key %1$s: %2$s', 'as-processor' ), esc_attr( $key ), esc_attr( Data_DB::db()->last_error ?: '' ) )
 			);
 		}
 
