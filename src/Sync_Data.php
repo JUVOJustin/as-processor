@@ -105,7 +105,7 @@ trait Sync_Data {
 		if ( ! $success ) {
 			throw new Exception(
 			/* translators: 1: The key name of the sync data trying to update., 2: The last db error. */
-				sprintf( esc_attr__( 'Failed to update sync data for key %1$s: %2$s', 'as-processor' ), esc_attr( $key ), esc_attr( Data_DB::db()->last_error ?: "" ) )
+				sprintf( esc_attr__( 'Failed to update sync data for key %1$s: %2$s', 'as-processor' ), esc_attr( $key ), esc_attr( Data_DB::db()->last_error ?: '' ) )
 			);
 		}
 
