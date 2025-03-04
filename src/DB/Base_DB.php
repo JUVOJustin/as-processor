@@ -78,6 +78,15 @@ abstract class Base_DB {
 	}
 
 	/**
+	 * Get the last error
+	 *
+	 * @return string
+	 */
+	public function get_last_error(): string {
+		return $this->db->last_error;
+	}
+
+	/**
 	 * Ensure the table exists.
 	 *
 	 * @return void
