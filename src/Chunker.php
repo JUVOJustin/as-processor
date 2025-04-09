@@ -54,15 +54,19 @@ trait Chunker {
 		$chunk = new Chunk();
 		$chunk->set_status( ProcessStatus::SCHEDULED );
 		$chunk->set_data( $chunk_data );
+		$chunk->set_group( $this->get_sync_group_name() );
 		$chunk->save();
 
-		as_enqueue_async_action(
+		$action_id = as_enqueue_async_action(
 			$this->get_sync_name() . '/process_chunk',
 			array(
 				'chunk_id' => $chunk->get_chunk_id(),
 			), // Wrap in array to pass as single argument. Needed because of abstract child method enforcement
 			$this->get_sync_group_name()
 		);
+
+		$chunk->set_action_id( $action_id );
+		$chunk->save();
 	}
 
 	/**
