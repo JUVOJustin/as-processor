@@ -192,7 +192,7 @@ abstract class Sync implements Syncable {
 		// Check if action of the same group is running or pending
 		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
 		if ( count( $actions ) === 0 ) {
-			do_action( $this->get_sync_name() . '/complete', $this->get_sync_group_name(), $this );
+			do_action( $this->get_sync_name() . '/complete', $this->get_sync_group_name() );
 		}
 	}
 
