@@ -219,8 +219,6 @@ abstract class Sync implements Syncable {
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
 			$chunk = new Chunk( $action_arguments['chunk_id'] );
 			$chunk->set_status( ProcessStatus::STARTED );
-			$chunk->set_action_id( $action_id );
-			$chunk->set_group( $this->get_sync_group_name() );
 			$chunk->set_start();
 			$chunk->save();
 		}
@@ -326,9 +324,6 @@ abstract class Sync implements Syncable {
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
 			$chunk = new Chunk( $action_arguments['chunk_id'] );
 			$chunk->set_status( ProcessStatus::CANCELLED );
-			$chunk->set_action_id( $action_id );
-			$chunk->set_group( $this->get_sync_group_name() );
-			$chunk->set_start();
 			$chunk->set_end();
 			$chunk->save();
 		}
