@@ -44,8 +44,8 @@ abstract class CSV extends Import
         $reader->setDelimiter($this->delimiter);
 
         // If src encoding is set convert table to utf-8
-        if (!empty($this->src_encoding)) {
-            $reader->addStreamFilter("convert.iconv.$this->src_encoding/UTF-8");
+        if (!empty($this->src_encoding) && $reader->supportsStreamFilterOnRead()) {
+	        $reader->appendStreamFilterOnRead("convert.iconv.$this->src_encoding/UTF-8");
         }
 
         // Maybe add header
