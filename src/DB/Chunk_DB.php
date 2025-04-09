@@ -377,6 +377,39 @@ class Chunk_DB extends Base_DB {
 	}
 
 	/**
+	 * Checks if all chunks of a specific group (sync) are completed.
+	 *
+	 * @param string $group_name The name of the group/sync to check.
+	 * @return bool|null Returns true if all chunks are completed, false if some are pending, null if no chunks found.
+	 */
+	public function are_all_chunks_completed(string $group_name): ?bool {
+		// First check if there are any chunks in this group
+		$total_query = $this->db->prepare(
+			"SELECT COUNT(*) FROM {$this->get_table_name()} WHERE `group` = %s",
+			$group_name
+		);
+
+		$total_chunks = (int) $this->db->get_var($total_query);
+
+		if ($total_chunks === 0) {
+			return null; // No chunks found for this group
+		}
+
+		// Check for incomplete chunks
+		$query = $this->db->prepare(
+			"SELECT COUNT(*) FROM {$this->get_table_name()} WHERE `group` = %s AND `status` != %s",
+			$group_name,
+			ProcessStatus::FINISHED->value
+		);
+
+		$incomplete_chunks_count = (int) $this->db->get_var($query);
+
+		// If the count is 0, it means all chunks are completed
+		return $incomplete_chunks_count === 0;
+	}
+
+
+	/**
 	 * Cleans up old chunk data based on a specified interval and status.
 	 *
 	 * @return void
