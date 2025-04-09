@@ -63,18 +63,16 @@ abstract class Sync implements Syncable {
 		add_action( 'action_scheduler_completed_action', array( $this, 'maybe_trigger_last_in_group' ) );
 		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
 
-		// If the child, has the callback, we hook it up
-		if ( method_exists( $this, 'after_sync_complete' ) ) {
-			add_action( $this->get_sync_name() . '/complete', array( $this, 'after_sync_complete' ) );
-		}
+		// If Sync complete execute after sync complete
+		add_action( $this->get_sync_name() . '/complete', array( $this, 'on_complete' ) );
 
 		// Hookup to error handling if on_fail is present in child
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
 		add_action( 'action_scheduler_canceled_action', array( $this, 'handle_cancel' ), 10 );
 		add_action( 'action_scheduler_failed_execution', array( $this, 'handle_exception' ), 10, 2 );
-		if ( method_exists( $this, 'on_fail' ) ) {
-			add_action( $this->get_sync_name() . '/fail', array( $this, 'on_fail' ), 10, 3 );
-		}
+
+		// If Sync failed execute on_fail
+		add_action( $this->get_sync_name() . '/fail', array( $this, 'on_fail' ) );
 
 		// Hook Sync DB Cleanup
 		add_action(
@@ -194,11 +192,7 @@ abstract class Sync implements Syncable {
 		// Check if action of the same group is running or pending
 		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
 		if ( count( $actions ) === 0 ) {
-			as_enqueue_async_action(
-				$this->get_sync_name() . '/complete',
-				array(), // empty arguments array
-				$this->get_sync_group_name()
-			);
+			do_action( $this->get_sync_name() . '/complete', $this->get_sync_group_name(), $this );
 		}
 	}
 
@@ -382,4 +376,29 @@ abstract class Sync implements Syncable {
 			$log_level
 		);
 	}
+
+	/**
+	 * Executes tasks after the synchronization process is complete.
+	 *
+	 * This method is triggered upon the completion of a synchronization process.
+	 * It can perform cleanup tasks, post-sync operations, or finalize other processes tied to the sync group.
+	 *
+	 * Intention is to overwrite this method in child classes to ease implementation.
+	 *
+	 * @return void
+	 */
+	public function on_complete(): void {}
+
+	/**
+	 * Handles the behavior when an action fails.
+	 *
+	 * This method is triggered when a job or process encounters a failure.
+	 * Can be extended to include specific failure handling or cleanup logic.
+	 *
+	 * Intention is to overwrite this method in child classes to ease implementation.
+	 *
+	 * @return void
+	 * @throws Exception When the failure cannot be processed properly.
+	 */
+	public function on_fail(): void {}
 }
