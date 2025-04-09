@@ -8,13 +8,13 @@
  * @package juvo\AS_Processor
  */
 
-namespace Zeller_Gmelin\Dependencies\juvo\AS_Processor;
+namespace juvo\AS_Processor;
 
 use Exception;
 use Generator;
-use Zeller_Gmelin\Dependencies\juvo\AS_Processor\DB\Chunk_DB;
-use Zeller_Gmelin\Dependencies\juvo\AS_Processor\Entities\ProcessStatus;
-use Zeller_Gmelin\Dependencies\juvo\AS_Processor\Entities\Chunk;
+use juvo\AS_Processor\DB\Chunk_DB;
+use juvo\AS_Processor\Entities\ProcessStatus;
+use juvo\AS_Processor\Entities\Chunk;
 
 /**
  * The Chunker.
