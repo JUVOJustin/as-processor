@@ -46,6 +46,7 @@ class Chunk_DB extends Base_DB {
             `data` longtext NOT NULL,
             `start` decimal(14,4) DEFAULT NULL,
             `end` decimal(14,4) DEFAULT NULL,
+            `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `status` (`status`),
             KEY `start` (`start`),
@@ -390,6 +391,9 @@ class Chunk_DB extends Base_DB {
 		$interval          = apply_filters( 'asp/chunks/cleanup/interval', 14 * DAY_IN_SECONDS );
 		$cleanup_timestamp = (int) time() - $interval;
 
+		// Convert UNIX timestamp to MySQL datetime format for created_at comparison
+		$cleanup_datetime = gmdate( 'Y-m-d H:i:s', $cleanup_timestamp );
+
 		/**
 		 * Filters the status of chunks to clean up.
 		 *
@@ -399,14 +403,16 @@ class Chunk_DB extends Base_DB {
 
 		if ( ProcessStatus::ALL === $status ) {
 			$query = $this->db->prepare(
-				"DELETE FROM {$this->get_table_name()} WHERE start < %f",
-				$cleanup_timestamp
+				"DELETE FROM {$this->get_table_name()} WHERE (start < %f OR created_at < %s)",
+				$cleanup_timestamp,
+				$cleanup_datetime
 			);
 		} else {
 			$query = $this->db->prepare(
-				"DELETE FROM {$this->get_table_name()} WHERE status = %s AND start < %f",
+				"DELETE FROM {$this->get_table_name()} WHERE status = %s AND (start < %f OR created_at < %s)",
 				$status->value,
-				$cleanup_timestamp
+				$cleanup_timestamp,
+				$cleanup_datetime
 			);
 		}
 
