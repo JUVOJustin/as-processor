@@ -1,2 +1,4 @@
 vendor
 .idea
+.ddev
+.phpunit.result.cache
