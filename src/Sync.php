@@ -416,52 +416,34 @@ abstract class Sync implements Syncable {
 	 */
 	public function get_status(): array {
 
-		// Check if there are any scheduled actions
-		$pending = as_get_scheduled_actions(
+		// Check if any chunk is pending. If so the current sync can be considered running
+		$running = as_get_scheduled_actions(
 			array(
-				'hook'     => $this->get_sync_name(),
+				'hook'     => $this->get_sync_name() . '/process_chunk',
 				'status'   => ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 1,
 			),
 			'ids'
 		);
 
-		$running = as_get_scheduled_actions(
-			array(
-				'hook'     => $this->get_sync_name(),
-				'status'   => ActionScheduler_Store::STATUS_RUNNING,
-				'per_page' => 1,
-			),
-			'ids'
-		);
-
-		// Get last run time
-		$completed = as_get_scheduled_actions(
-			array(
-				'hook'     => $this->get_sync_name() . '/process_chunk',
-				'status'   => ActionScheduler_Store::STATUS_COMPLETE,
-				'per_page' => 1,
-				'order'    => 'DESC',
-			)
-		);
-
-		$last_run = null;
-		if ( ! empty( $completed ) ) {
-			$action = reset( $completed );
+		$last_run = Chunk_DB::db()->get_latest_sync_groups( $this->get_sync_name(), 1);
+		if ( ! empty( $last_run ) ) {
+			$action = reset( $last_run );
 
 			// Build the stats URL
 			$stats_url = rest_url( 'as-processor/v1/syncs/stats' );
 			$stats_url = add_query_arg(
 				array(
 					'key'        => Sync_Key_Helper::encode( $this->get_sync_name() ),
-					'group_name' => $action->get_group(),
+					'group_name' => $action['group_name'],
 				),
 				$stats_url
 			);
 
 			$last_run = array(
-				'timestamp'  => Chunk_DB::db()->get_sync_end( $action->get_group() )?->format( DateTimeImmutable::ATOM ),
-				'group_name' => $action->get_group(),
+				'start'  => $action['start'] ?->format( DateTimeImmutable::ATOM ),
+				'end'  => $action['end'] ?->format( DateTimeImmutable::ATOM ),
+				'group_name' => $action['group_name'],
 				'stats_url'  => $stats_url,
 			);
 		}
@@ -472,7 +454,6 @@ abstract class Sync implements Syncable {
 
 		return array(
 			'is_running'  => ! empty( $running ),
-			'has_pending' => ! empty( $pending ),
 			'last_run'    => $last_run,
 			'next_run'    => $next_run,
 		);

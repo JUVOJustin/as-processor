@@ -116,6 +116,11 @@ class Sync_REST_Controller extends WP_REST_Controller {
 							'type'        => 'string',
 							'required'    => true,
 						),
+						'group_name' => array(
+							'description' => __( 'Optional sync group name to fetch actions for.', 'as-processor' ),
+							'type'        => 'string',
+							'required'    => false,
+						),
 					),
 				),
 			)
@@ -148,7 +153,6 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			if ( $info ) {
 				$sync           = $registry->create_sync( $key );
 				$info['status'] = $sync->get_status();
-				// Encode the key for REST API output.
 				$info['key'] = Sync_Key_Helper::encode( $info['key'] );
 				$items[]     = $info;
 			}
@@ -186,6 +190,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 		}
 
 		$info['status'] = $sync->get_status();
+
 		// Encode the key for REST API output.
 		$info['key'] = Sync_Key_Helper::encode( $info['key'] );
 

@@ -7,8 +7,6 @@
 
 namespace juvo\AS_Processor;
 
-use ActionScheduler_Store;
-
 /**
  * Class Sync_Registry
  *
