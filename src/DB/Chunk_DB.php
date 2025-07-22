@@ -62,9 +62,9 @@ class Chunk_DB extends Base_DB {
 	 * Retrieve a row from the database by its ID.
 	 *
 	 * @param int $id The ID of the row to retrieve.
-	 * @return bool|array Returns an array representing the row if found, or false if the row does not exist.
+	 * @return array<string, mixed>|false Returns an array representing the row if found, or false if the row does not exist.
 	 */
-	public function get_row_by_id( int $id ): bool|array {
+	public function get_row_by_id( int $id ): false|array {
 		$row = $this->db->get_row(
 			$this->db->prepare(
 				"SELECT * FROM {$this->get_table_name()} WHERE id = %d",
@@ -82,7 +82,6 @@ class Chunk_DB extends Base_DB {
 	 * @return ?Chunk
 	 */
 	public function get_chunk( string $query ): ?Chunk {
-
 		$row = $this->db->get_row( $query, ARRAY_A );
 
 		if ( ! $row ) {

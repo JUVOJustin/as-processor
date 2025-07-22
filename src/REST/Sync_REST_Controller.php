@@ -128,7 +128,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 	 * @param WP_REST_Request $request Request object.
 	 * @return bool
 	 */
-	public function permissions_check( $request ): bool {
+	public function permissions_check( WP_REST_Request $request ): bool {
 		return current_user_can( 'manage_options' );
 	}
 
@@ -136,9 +136,10 @@ class Sync_REST_Controller extends WP_REST_Controller {
 	 * Get all syncs.
 	 *
 	 * @param WP_REST_Request $request Request object.
-	 * @return WP_REST_Response|WP_Error
+	 * @return WP_REST_Response Response containing array of sync info.
 	 */
-	public function get_items( $request ) {
+	public function get_items( $request ): WP_REST_Response {
+
 		$registry = Sync_Registry::instance();
 		$items    = array();
 
@@ -162,7 +163,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 	 * @param WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function get_item( $request ) {
+	public function get_item( $request ): WP_REST_Response|WP_Error {
 		$key      = Sync_Key_Helper::decode( $request->get_param( 'key' ) );
 		$registry = Sync_Registry::instance();
 
@@ -175,7 +176,15 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			);
 		}
 
-		$sync           = $registry->create_sync( $key );
+		$sync = $registry->create_sync( $key );
+		if ( ! $sync ) {
+			return new WP_Error(
+				'sync_not_found',
+				__( 'Sync not found', 'as-processor' ),
+				array( 'status' => 404 )
+			);
+		}
+
 		$info['status'] = $sync->get_status();
 		// Encode the key for REST API output.
 		$info['key'] = Sync_Key_Helper::encode( $info['key'] );
@@ -189,7 +198,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 	 * @param WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function trigger_sync( $request ) {
+	public function trigger_sync( WP_REST_Request $request ): WP_Error|WP_REST_Response {
 		$key  = Sync_Key_Helper::decode( $request->get_param( 'key' ) );
 		$sync = Sync_Registry::instance()->create_sync( $key );
 
@@ -237,7 +246,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 	 * @param WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function get_stats( $request ) {
+	public function get_stats( WP_REST_Request $request ): WP_Error|WP_REST_Response {
 		$key        = Sync_Key_Helper::decode( $request->get_param( 'key' ) );
 		$group_name = $request->get_param( 'group_name' );
 		$sync       = Sync_Registry::instance()->create_sync( $key );
@@ -260,8 +269,8 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			);
 		}
 
-		// Get stats data without JSON encoding
-		$stats_data = json_decode( $stats->to_json(), true );
+		// Get stats data as array, excluding 'data' field from chunks.
+		$stats_data = $stats->to_array( array(), array( 'data' ) );
 
 		return rest_ensure_response( $stats_data );
 	}

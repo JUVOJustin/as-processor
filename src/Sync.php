@@ -448,7 +448,7 @@ abstract class Sync implements Syncable {
 		$last_run = null;
 		if ( ! empty( $completed ) ) {
 			$action = reset( $completed );
-			
+
 			// Build the stats URL
 			$stats_url = rest_url( 'as-processor/v1/syncs/stats' );
 			$stats_url = add_query_arg(
@@ -458,9 +458,9 @@ abstract class Sync implements Syncable {
 				),
 				$stats_url
 			);
-			
+
 			$last_run = array(
-				'timestamp'  => Chunk_DB::db()->get_sync_end($action->get_group())?->format(DateTimeImmutable::ATOM),
+				'timestamp'  => Chunk_DB::db()->get_sync_end( $action->get_group() )?->format( DateTimeImmutable::ATOM ),
 				'group_name' => $action->get_group(),
 				'stats_url'  => $stats_url,
 			);

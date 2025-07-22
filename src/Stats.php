@@ -35,30 +35,62 @@ class Stats
 	/**
 	 * Converts the current object state and additional data to a JSON representation.
 	 *
-	 * @param array $custom_data Additional custom data to be included in the JSON output.
-	 * @param array $excludedFields Fields to be excluded from the JSON output for specific actions.
+	 * @param array<string, mixed> $custom_data Additional custom data to be included in the JSON output.
+	 * @param array<string> $excludedFields Fields to be excluded from the JSON output for specific actions.
 	 * @return string The JSON representation of the object including the provided custom data and excluded fields configuration.
 	 */
     public function to_json(array $custom_data = [], array $excludedFields = []): string
     {
-		$actions = Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name);
-		$actions = array_map(function (Chunk $chunk) use ($excludedFields) {
-			return $chunk->setJsonExcludedFields($excludedFields);
-		}, $actions);
-
-        $data = [
-            'sync_start'              => Chunk_DB::db()->get_sync_start($this->group_name)?->format(DateTimeImmutable::ATOM),
-            'sync_end'                => Chunk_DB::db()->get_sync_end($this->group_name)?->format(DateTimeImmutable::ATOM),
-            'total_actions'           => Chunk_DB::db()->get_total_actions($this->group_name),
-            'sync_duration'           => Chunk_DB::db()->get_sync_duration($this->group_name),
-            'average_action_duration' => Chunk_DB::db()->get_average_action_duration($this->group_name),
-            'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name)->setJsonExcludedFields($excludedFields),
-            'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name)->setJsonExcludedFields($excludedFields),
-            'actions'                 => $actions,
-            'custom_data'             => $custom_data
-        ];
-        return wp_json_encode($data);
+        return wp_json_encode( $this->to_array( $custom_data, $excludedFields ) );
     }
+
+	/**
+	 * Get stats data as an array.
+	 *
+	 * @param array<string, mixed> $custom_data Additional custom data to be included.
+	 * @param array<string> $excludedFields Fields to be excluded from the output for specific actions.
+	 * @return array{
+	 *     sync_start: string|null,
+	 *     sync_end: string|null,
+	 *     total_actions: int,
+	 *     sync_duration: float,
+	 *     average_action_duration: float,
+	 *     slowest_action: array{chunk_id: int|null, action_id: int|null, group: string|null, status: string|null, data: array<mixed>|null, start: string|null, end: string|null, logs: array<mixed>, duration: float},
+	 *     fastest_action: array{chunk_id: int|null, action_id: int|null, group: string|null, status: string|null, data: array<mixed>|null, start: string|null, end: string|null, logs: array<mixed>, duration: float},
+	 *     actions: array<array{chunk_id: int|null, action_id: int|null, group: string|null, status: string|null, data: array<mixed>|null, start: string|null, end: string|null, logs: array<mixed>, duration: float}>,
+	 *     custom_data?: array<string, mixed>
+	 * }
+	 */
+	public function to_array( array $custom_data = [], array $excludedFields = [] ): array {
+		$actions = Chunk_DB::db()->get_chunks_by_status( group_name: $this->group_name );
+		$actions = array_map( function ( Chunk $chunk ) use ( $excludedFields ) {
+			$chunk->setJsonExcludedFields( $excludedFields );
+			return $chunk->jsonSerialize();
+		}, $actions );
+
+		$slowest = Chunk_DB::db()->get_slowest_action( $this->group_name );
+		$slowest->setJsonExcludedFields( $excludedFields );
+
+		$fastest = Chunk_DB::db()->get_fastest_action( $this->group_name );
+		$fastest->setJsonExcludedFields( $excludedFields );
+
+		$data = [
+			'sync_start'              => Chunk_DB::db()->get_sync_start( $this->group_name )?->format( DateTimeImmutable::ATOM ),
+			'sync_end'                => Chunk_DB::db()->get_sync_end( $this->group_name )?->format( DateTimeImmutable::ATOM ),
+			'total_actions'           => Chunk_DB::db()->get_total_actions( $this->group_name ),
+			'sync_duration'           => Chunk_DB::db()->get_sync_duration( $this->group_name ),
+			'average_action_duration' => Chunk_DB::db()->get_average_action_duration( $this->group_name ),
+			'slowest_action'          => $slowest->jsonSerialize(),
+			'fastest_action'          => $fastest->jsonSerialize(),
+			'actions'                 => $actions,
+		];
+
+		if ( $custom_data ) {
+			$data['custom_data'] = $custom_data;
+		}
+
+		return $data;
+	}
 
 	/**
 	 * Prepare an email text report, including custom data.

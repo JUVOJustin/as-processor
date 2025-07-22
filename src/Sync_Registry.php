@@ -97,8 +97,8 @@ class Sync_Registry {
 		}
 
 		$info = array(
-			'key'         => $key,
-			'type'        => $this->get_sync_type( $sync ),
+			'key'  => $key,
+			'type' => $this->get_sync_type( $sync ),
 		);
 
 		if ( method_exists( $sync, 'get_description' ) ) {
