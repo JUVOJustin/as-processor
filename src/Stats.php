@@ -2,6 +2,7 @@
 
 namespace juvo\AS_Processor;
 
+use ActionScheduler_Store;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use juvo\AS_Processor\DB\Chunk_DB;
@@ -54,6 +55,7 @@ class Stats
 	 *     sync_end: string|null,
 	 *     total_actions: int,
 	 *     sync_duration: float,
+	 *     completed: bool,
 	 *     average_action_duration: float,
 	 *     slowest_action: array{chunk_id: int|null, action_id: int|null, group: string|null, status: string|null, data: array<mixed>|null, start: string|null, end: string|null, logs: array<mixed>, duration: float},
 	 *     fastest_action: array{chunk_id: int|null, action_id: int|null, group: string|null, status: string|null, data: array<mixed>|null, start: string|null, end: string|null, logs: array<mixed>, duration: float},
@@ -74,11 +76,22 @@ class Stats
 		$fastest = Chunk_DB::db()->get_fastest_action( $this->group_name );
 		$fastest->setJsonExcludedFields( $excludedFields );
 
+		// Check if there are any scheduled actions
+		$pending = as_get_scheduled_actions(
+			array(
+				'group'     => $this->group_name,
+				'status'   => ActionScheduler_Store::STATUS_PENDING,
+				'per_page' => 1,
+			),
+			'ids'
+		);
+
 		$data = [
 			'sync_start'              => Chunk_DB::db()->get_sync_start( $this->group_name )?->format( DateTimeImmutable::ATOM ),
 			'sync_end'                => Chunk_DB::db()->get_sync_end( $this->group_name )?->format( DateTimeImmutable::ATOM ),
 			'total_actions'           => Chunk_DB::db()->get_total_actions( $this->group_name ),
 			'sync_duration'           => Chunk_DB::db()->get_sync_duration( $this->group_name ),
+			'completed'               => count( $pending ) === 0,
 			'average_action_duration' => Chunk_DB::db()->get_average_action_duration( $this->group_name ),
 			'slowest_action'          => $slowest->jsonSerialize(),
 			'fastest_action'          => $fastest->jsonSerialize(),
