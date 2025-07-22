@@ -430,21 +430,10 @@ abstract class Sync implements Syncable {
 		if ( ! empty( $last_run ) ) {
 			$action = reset( $last_run );
 
-			// Build the stats URL
-			$stats_url = rest_url( 'as-processor/v1/syncs/stats' );
-			$stats_url = add_query_arg(
-				array(
-					'key'        => Sync_Key_Helper::encode( $this->get_sync_name() ),
-					'group_name' => $action['group_name'],
-				),
-				$stats_url
-			);
-
 			$last_run = array(
 				'start'  => $action['start'] ?->format( DateTimeImmutable::ATOM ),
 				'end'  => $action['end'] ?->format( DateTimeImmutable::ATOM ),
-				'group_name' => $action['group_name'],
-				'stats_url'  => $stats_url,
+				'group_name' => $action['group_name']
 			);
 		}
 
