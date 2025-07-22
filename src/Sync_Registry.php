@@ -96,13 +96,16 @@ class Sync_Registry {
 			return null;
 		}
 
-		return array(
+		$info = array(
 			'key'         => $key,
-			'name'        => $sync->get_display_name(),
-			'description' => $sync->get_description(),
 			'type'        => $this->get_sync_type( $sync ),
-			'group'       => $sync->get_sync_group_name(),
 		);
+
+		if ( method_exists( $sync, 'get_description' ) ) {
+			$info['description'] = $sync->get_description();
+		}
+
+		return $info;
 	}
 
 	/**

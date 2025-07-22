@@ -108,20 +108,6 @@ abstract class Sync implements Syncable {
 	abstract public function get_sync_name(): string;
 
 	/**
-	 * Get human-readable display name.
-	 *
-	 * @return string
-	 */
-	abstract public function get_display_name(): string;
-
-	/**
-	 * Get sync description.
-	 *
-	 * @return string
-	 */
-	abstract public function get_description(): string;
-
-	/**
 	 * Callback for the Chunk jobs. The child implementation either dispatches to an import or an export
 	 *
 	 * @param int $chunk_id Database ID of the chunk that should be processed.
@@ -427,13 +413,11 @@ abstract class Sync implements Syncable {
 	 * @return array<string, mixed>
 	 */
 	public function get_status(): array {
-		$group_name = $this->get_sync_group_name();
-		$chunk_db   = Chunk_DB::db();
 
 		// Check if there are any scheduled actions
 		$pending = as_get_scheduled_actions(
 			array(
-				'group'    => $group_name,
+				'hook'     => $this->get_sync_name(),
 				'status'   => ActionScheduler_Store::STATUS_PENDING,
 				'per_page' => 1,
 			),
@@ -442,7 +426,7 @@ abstract class Sync implements Syncable {
 
 		$running = as_get_scheduled_actions(
 			array(
-				'group'    => $group_name,
+				'hook'     => $this->get_sync_name(),
 				'status'   => ActionScheduler_Store::STATUS_RUNNING,
 				'per_page' => 1,
 			),
@@ -452,7 +436,7 @@ abstract class Sync implements Syncable {
 		// Get last run time
 		$completed = as_get_scheduled_actions(
 			array(
-				'group'    => $group_name,
+				'hook'     => $this->get_sync_name(),
 				'status'   => ActionScheduler_Store::STATUS_COMPLETE,
 				'per_page' => 1,
 				'order'    => 'DESC',
@@ -469,28 +453,11 @@ abstract class Sync implements Syncable {
 		$next     = as_next_scheduled_action( $this->get_sync_name() );
 		$next_run = $next ? wp_date( 'c', $next ) : null;
 
-		$status = array(
+		return array(
 			'is_running'  => ! empty( $running ),
 			'has_pending' => ! empty( $pending ),
 			'last_run'    => $last_run,
 			'next_run'    => $next_run,
 		);
-
-		// Add detailed stats if sync has completed chunks
-		$total_actions = $chunk_db->get_total_actions( $group_name );
-		if ( $total_actions > 0 ) {
-			$stats           = new Stats( $group_name );
-			$status['stats'] = array(
-				'sync_start'              => $chunk_db->get_sync_start( $group_name )?->format( 'c' ),
-				'sync_end'                => $chunk_db->get_sync_end( $group_name )?->format( 'c' ),
-				'total_actions'           => $total_actions,
-				'sync_duration'           => $chunk_db->get_sync_duration( $group_name, true ),
-				'average_action_duration' => $chunk_db->get_average_action_duration( $group_name, true ),
-				'failed_actions'          => count( $chunk_db->get_chunks_by_status( $group_name, ProcessStatus::FAILED ) ),
-				'completed_actions'       => count( $chunk_db->get_chunks_by_status( $group_name, ProcessStatus::FINISHED ) ),
-			);
-		}
-
-		return $status;
 	}
 }

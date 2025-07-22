@@ -118,7 +118,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 		// Get detailed sync stats.
 		register_rest_route(
 			$this->namespace,
-			'/' . $this->rest_base . '/(?P<key>[\w-]+)/stats',
+			'/' . $this->rest_base . '/stats',
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
@@ -133,7 +133,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 						'group_name' => array(
 							'description' => __( 'Specific group name for stats.', 'as-processor' ),
 							'type'        => 'string',
-							'required'    => false,
+							'required'    => true,
 						),
 					),
 				),
@@ -237,9 +237,9 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			array(
 				'action_id' => $action_id,
 				'message'   => sprintf(
-					/* translators: %s: sync display name */
+					/* translators: %s: sync name */
 					__( '%s triggered successfully', 'as-processor' ),
-					$sync->get_display_name()
+					$sync->get_sync_name()
 				),
 				'sync_key'  => $key,
 			)
@@ -284,11 +284,6 @@ class Sync_REST_Controller extends WP_REST_Controller {
 				__( 'Sync not found', 'as-processor' ),
 				array( 'status' => 404 )
 			);
-		}
-
-		// Use provided group name or get the current one
-		if ( empty( $group_name ) ) {
-			$group_name = $sync->get_sync_group_name();
 		}
 
 		$stats = new Stats( $group_name );
