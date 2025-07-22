@@ -3,6 +3,7 @@
 namespace juvo\AS_Processor;
 
 use DateTimeImmutable;
+use InvalidArgumentException;
 use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
@@ -21,8 +22,13 @@ class Stats
      * Stats constructor.
      *
      * @param string $group_name The group name for the sync process.
+     *
+     * @throws InvalidArgumentException If no actions are found for the provided group name.
      */
     public function __construct(string $group_name) {
+		if (empty(Chunk_DB::db()->get_total_actions($group_name))) {
+			throw new InvalidArgumentException('No actions found for group.' . $group_name);
+		}
         $this->group_name = $group_name;
     }
 
@@ -35,7 +41,6 @@ class Stats
 	 */
     public function to_json(array $custom_data = [], array $excludedFields = []): string
     {
-
 		$actions = Chunk_DB::db()->get_chunks_by_status(group_name: $this->group_name);
 		$actions = array_map(function (Chunk $chunk) use ($excludedFields) {
 			return $chunk->setJsonExcludedFields($excludedFields);
@@ -52,7 +57,7 @@ class Stats
             'actions'                 => $actions,
             'custom_data'             => $custom_data
         ];
-        return json_encode($data);
+        return wp_json_encode($data);
     }
 
 	/**

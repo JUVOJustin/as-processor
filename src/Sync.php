@@ -11,8 +11,10 @@ namespace juvo\AS_Processor;
 use ActionScheduler;
 use ActionScheduler_Action;
 use ActionScheduler_Store;
+use DateTimeImmutable;
 use Exception;
 use juvo\AS_Processor\DB\Chunk_DB;
+use juvo\AS_Processor\REST\Sync_Key_Helper;
 use juvo\AS_Processor\DB\Data_DB;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
@@ -436,7 +438,7 @@ abstract class Sync implements Syncable {
 		// Get last run time
 		$completed = as_get_scheduled_actions(
 			array(
-				'hook'     => $this->get_sync_name(),
+				'hook'     => $this->get_sync_name() . '/process_chunk',
 				'status'   => ActionScheduler_Store::STATUS_COMPLETE,
 				'per_page' => 1,
 				'order'    => 'DESC',
@@ -445,8 +447,23 @@ abstract class Sync implements Syncable {
 
 		$last_run = null;
 		if ( ! empty( $completed ) ) {
-			$action   = reset( $completed );
-			$last_run = $action->get_schedule()->get_date()->format( 'c' );
+			$action = reset( $completed );
+			
+			// Build the stats URL
+			$stats_url = rest_url( 'as-processor/v1/syncs/stats' );
+			$stats_url = add_query_arg(
+				array(
+					'key'        => Sync_Key_Helper::encode( $this->get_sync_name() ),
+					'group_name' => $action->get_group(),
+				),
+				$stats_url
+			);
+			
+			$last_run = array(
+				'timestamp'  => Chunk_DB::db()->get_sync_end($action->get_group())?->format(DateTimeImmutable::ATOM),
+				'group_name' => $action->get_group(),
+				'stats_url'  => $stats_url,
+			);
 		}
 
 		// Get next run time

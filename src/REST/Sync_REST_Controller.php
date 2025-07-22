@@ -7,6 +7,7 @@
 
 namespace juvo\AS_Processor\REST;
 
+use InvalidArgumentException;
 use juvo\AS_Processor\Stats;
 use juvo\AS_Processor\Sync_Registry;
 use WP_Error;
@@ -55,18 +56,23 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			)
 		);
 
-		// Get single sync info.
+		// Get detailed sync stats - Register before single sync to avoid route conflict.
 		register_rest_route(
 			$this->namespace,
-			'/' . $this->rest_base . '/(?P<key>[\w-]+)',
+			'/' . $this->rest_base . '/stats',
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
-					'callback'            => array( $this, 'get_item' ),
+					'callback'            => array( $this, 'get_stats' ),
 					'permission_callback' => array( $this, 'permissions_check' ),
 					'args'                => array(
-						'key' => array(
+						'key'        => array(
 							'description' => __( 'Sync key identifier.', 'as-processor' ),
+							'type'        => 'string',
+							'required'    => true,
+						),
+						'group_name' => array(
+							'description' => __( 'Specific group name for stats.', 'as-processor' ),
 							'type'        => 'string',
 							'required'    => true,
 						),
@@ -75,7 +81,7 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			)
 		);
 
-		// Trigger sync.
+		// Trigger sync - Register before single sync to avoid route conflict.
 		register_rest_route(
 			$this->namespace,
 			'/' . $this->rest_base . '/(?P<key>[\w-]+)/trigger',
@@ -95,43 +101,18 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			)
 		);
 
-		// Get sync status.
+		// Get single sync info - Register last as it's the most generic pattern.
 		register_rest_route(
 			$this->namespace,
-			'/' . $this->rest_base . '/(?P<key>[\w-]+)/status',
+			'/' . $this->rest_base . '/(?P<key>[\w-]+)',
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
-					'callback'            => array( $this, 'get_status' ),
+					'callback'            => array( $this, 'get_item' ),
 					'permission_callback' => array( $this, 'permissions_check' ),
 					'args'                => array(
 						'key' => array(
 							'description' => __( 'Sync key identifier.', 'as-processor' ),
-							'type'        => 'string',
-							'required'    => true,
-						),
-					),
-				),
-			)
-		);
-
-		// Get detailed sync stats.
-		register_rest_route(
-			$this->namespace,
-			'/' . $this->rest_base . '/stats',
-			array(
-				array(
-					'methods'             => WP_REST_Server::READABLE,
-					'callback'            => array( $this, 'get_stats' ),
-					'permission_callback' => array( $this, 'permissions_check' ),
-					'args'                => array(
-						'key'        => array(
-							'description' => __( 'Sync key identifier.', 'as-processor' ),
-							'type'        => 'string',
-							'required'    => true,
-						),
-						'group_name' => array(
-							'description' => __( 'Specific group name for stats.', 'as-processor' ),
 							'type'        => 'string',
 							'required'    => true,
 						),
@@ -251,27 +232,6 @@ class Sync_REST_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Get sync status.
-	 *
-	 * @param WP_REST_Request $request Request object.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function get_status( $request ) {
-		$key  = Sync_Key_Helper::decode( $request->get_param( 'key' ) );
-		$sync = Sync_Registry::instance()->create_sync( $key );
-
-		if ( ! $sync ) {
-			return new WP_Error(
-				'sync_not_found',
-				__( 'Sync not found', 'as-processor' ),
-				array( 'status' => 404 )
-			);
-		}
-
-		return rest_ensure_response( $sync->get_status() );
-	}
-
-	/**
 	 * Get detailed sync stats.
 	 *
 	 * @param WP_REST_Request $request Request object.
@@ -290,7 +250,15 @@ class Sync_REST_Controller extends WP_REST_Controller {
 			);
 		}
 
-		$stats = new Stats( $group_name );
+		try {
+			$stats = new Stats( $group_name );
+		} catch ( InvalidArgumentException $e ) {
+			return new WP_Error(
+				'sync_group_not_found',
+				__( 'Sync Group not found', 'as-processor' ),
+				array( 'status' => 404 )
+			);
+		}
 
 		// Get stats data without JSON encoding
 		$stats_data = json_decode( $stats->to_json(), true );
