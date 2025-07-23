@@ -11,8 +11,10 @@ namespace juvo\AS_Processor;
 use ActionScheduler;
 use ActionScheduler_Action;
 use ActionScheduler_Store;
+use DateTimeImmutable;
 use Exception;
 use juvo\AS_Processor\DB\Chunk_DB;
+use juvo\AS_Processor\REST\Sync_Key_Helper;
 use juvo\AS_Processor\DB\Data_DB;
 use juvo\AS_Processor\Entities\Chunk;
 use juvo\AS_Processor\Entities\ProcessStatus;
@@ -51,6 +53,7 @@ abstract class Sync implements Syncable {
 	 */
 	public function __construct() {
 		$this->set_hooks();
+		$this->register();
 	}
 
 	/**
@@ -396,4 +399,52 @@ abstract class Sync implements Syncable {
 	 * @throws Exception When the failure cannot be processed properly.
 	 */
 	public function on_fail(): void {}
+
+	/**
+	 * Register this sync with the registry.
+	 *
+	 * @return void
+	 */
+	protected function register(): void {
+		Sync_Registry::instance()->register( $this );
+	}
+
+	/**
+	 * Get current sync status.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_status(): array {
+
+		// Check if any chunk is pending. If so the current sync can be considered running
+		$running = as_get_scheduled_actions(
+			array(
+				'hook'     => $this->get_sync_name() . '/process_chunk',
+				'status'   => ActionScheduler_Store::STATUS_PENDING,
+				'per_page' => 1,
+			),
+			'ids'
+		);
+
+		$last_run = Chunk_DB::db()->get_latest_sync_groups( $this->get_sync_name(), 1);
+		if ( ! empty( $last_run ) ) {
+			$action = reset( $last_run );
+
+			$last_run = array(
+				'start'  => $action['start'] ?->format( DateTimeImmutable::ATOM ),
+				'end'  => $action['end'] ?->format( DateTimeImmutable::ATOM ),
+				'group_name' => $action['group_name']
+			);
+		}
+
+		// Get next run time
+		$next     = as_next_scheduled_action( $this->get_sync_name() );
+		$next_run = $next ? wp_date( 'c', $next ) : null;
+
+		return array(
+			'is_running'  => ! empty( $running ),
+			'last_run'    => $last_run,
+			'next_run'    => $next_run,
+		);
+	}
 }

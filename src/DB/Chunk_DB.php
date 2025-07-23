@@ -62,9 +62,9 @@ class Chunk_DB extends Base_DB {
 	 * Retrieve a row from the database by its ID.
 	 *
 	 * @param int $id The ID of the row to retrieve.
-	 * @return bool|array Returns an array representing the row if found, or false if the row does not exist.
+	 * @return array<string, mixed>|false Returns an array representing the row if found, or false if the row does not exist.
 	 */
-	public function get_row_by_id( int $id ): bool|array {
+	public function get_row_by_id( int $id ): false|array {
 		$row = $this->db->get_row(
 			$this->db->prepare(
 				"SELECT * FROM {$this->get_table_name()} WHERE id = %d",
@@ -82,7 +82,6 @@ class Chunk_DB extends Base_DB {
 	 * @return ?Chunk
 	 */
 	public function get_chunk( string $query ): ?Chunk {
-
 		$row = $this->db->get_row( $query, ARRAY_A );
 
 		if ( ! $row ) {
@@ -408,6 +407,69 @@ class Chunk_DB extends Base_DB {
 		return 0 === $incomplete_chunks_count;
 	}
 
+
+	/**
+	 * Retrieves the latest "n" distinct sync groups with their start and end timestamps.
+	 *
+	 * @param string $sync_name The sync name prefix to filter group names (e.g., "dmz_file_import").
+	 * @param int    $limit The maximum number of groups to retrieve. Defaults to 10.
+	 * @return array<array{group_name: string, start: ?DateTimeImmutable, end: ?DateTimeImmutable}> An associative array where keys are group names
+	 *                                                                                   and values contain start/end DateTimeImmutable objects.
+	 *                                                                                   End is only set if all chunks are complete.
+	 */
+	public function get_latest_sync_groups( string $sync_name, int $limit = 10 ): array {
+		// Get groups ordered by latest activity
+		$groups_query = $this->db->prepare(
+			"SELECT DISTINCT `group`
+			FROM {$this->get_table_name()} 
+			WHERE `group` LIKE %s
+			GROUP BY `group`
+			ORDER BY MAX(created_at) DESC 
+			LIMIT %d",
+			$sync_name . '%',
+			$limit
+		);
+
+		$group_names = $this->db->get_col( $groups_query );
+
+		if ( empty( $group_names ) ) {
+			return array();
+		}
+
+		$groups = array();
+		
+		// Get start/end times and completion status for each group
+		foreach ( $group_names as $group_name ) {
+			// Get start time and check if all chunks are complete
+			$stats_query = $this->db->prepare(
+				"SELECT 
+					MIN(start) as sync_start,
+					MAX(end) as sync_end,
+					COUNT(*) as total_chunks,
+					SUM(CASE WHEN status IN (%s, %s, %s) THEN 1 ELSE 0 END) as completed_chunks
+				FROM {$this->get_table_name()}
+				WHERE `group` = %s",
+				ProcessStatus::FINISHED->value,
+				ProcessStatus::FAILED->value,
+				ProcessStatus::CANCELLED->value,
+				$group_name
+			);
+			
+			$stats = $this->db->get_row( $stats_query, ARRAY_A );
+
+			$groups[] = array(
+				'group_name' => $group_name,
+				'start' => ! empty( $stats['sync_start'] )
+					? Helper::convert_microtime_to_datetime( $stats['sync_start'] )
+					: null,
+				'end'   => ( $stats['total_chunks'] === $stats['completed_chunks'] && ! empty( $stats['sync_end'] ) )
+					? Helper::convert_microtime_to_datetime( $stats['sync_end'] )
+					: null
+			);
+		}
+
+		return $groups;
+	}
 
 	/**
 	 * Cleans up old chunk data based on a specified interval and status.

@@ -52,5 +52,8 @@
         "phpcs": "@php ./vendor/bin/phpcs --report-full",
         "phpcs:ci": "@phpcs --report-checkstyle=./phpcs-report.xml",
         "phpcbf": "@php ./vendor/bin/phpcbf"
+    },
+    "archive": {
+        "exclude": [".claude", "CLAUDE.md", ".github", "tests"]
     }
 }
