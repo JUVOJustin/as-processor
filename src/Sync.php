@@ -206,10 +206,19 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
-		// avoid recursion by not hooking a complete/finish action while
-		// in complete/finish context
-		if ( $action->get_hook() === $this->get_sync_name() . '/complete' ||
-			$action->get_hook() === $this->get_sync_name() . '/finish' ) {
+		// avoid recursion by not hooking lifecycle actions
+		$sync_name           = $this->get_sync_name();
+		$lifecycle_hooks     = array( '/complete', '/finish' );
+		$is_lifecycle_action = false;
+
+		foreach ( $lifecycle_hooks as $hook_suffix ) {
+			if ( $action->get_hook() === $sync_name . $hook_suffix ) {
+				$is_lifecycle_action = true;
+				break;
+			}
+		}
+
+		if ( $is_lifecycle_action ) {
 			return;
 		}
 
