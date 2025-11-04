@@ -200,7 +200,10 @@ abstract class Sync implements Syncable {
 	 * Runs when an action is started.
 	 *
 	 * Callback for "action_scheduler_before_execute" hook. It gets the current action and (re)sets the group name.
-	 * This is needed to have a consistent group name through all executions of a group
+	 * This is needed to have a consistent group name through all executions of a group.
+	 *
+	 * Fires a '{sync_name}/start' action hook with the ActionScheduler_Action object and action ID as parameters,
+	 * allowing external code to hook into the start of any sync-related action (both dispatcher and chunk actions).
 	 *
 	 * @param int $action_id ID of the action to track.
 	 * @return void
@@ -222,6 +225,8 @@ abstract class Sync implements Syncable {
 			$chunk->set_start();
 			$chunk->save();
 		}
+
+		do_action( $this->get_sync_name() . '/start', $action, $action_id );
 	}
 
 	/**
