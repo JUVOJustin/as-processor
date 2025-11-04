@@ -22,14 +22,6 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  * This class initializes hooks, processes actions in chunks, handles errors, and manages
  * group naming and lifecycle for synchronization tasks. It provides structure and methods
  * for scheduling, tracking, and completing chunks within a synchronization process.
- *
- * Lifecycle Hooks:
- * - {sync_name}/start: Fired when an action begins execution (implemented via track_action_start).
- * - {sync_name}/complete: Fired for each sync-owned action upon completion, including chunk and dispatcher actions.
- * - {sync_name}/finish: Fired once when all actions in the sync group are complete.
- * - {sync_name}/fail: Fired when an action encounters an exception during execution.
- * - {sync_name}/cancel: Fired when an action is cancelled.
- * - {sync_name}/timeout: Fired when an action times out.
  */
 abstract class Sync implements Syncable {
 
@@ -42,27 +34,6 @@ abstract class Sync implements Syncable {
 	 * @var string
 	 */
 	private string $sync_group_name;
-
-	/**
-	 * Flag to prevent double firing of the finish hook
-	 *
-	 * @var bool
-	 */
-	private bool $finish_hook_fired = false;
-
-	/**
-	 * Flag to track if deprecation warning has been shown
-	 *
-	 * @var bool
-	 */
-	private static bool $deprecation_warning_shown = false;
-
-	/**
-	 * Cache for reflection check to avoid repeated reflection calls
-	 *
-	 * @var array<string, bool>
-	 */
-	private static array $override_cache = array();
 
 	/**
 	 * ID of the action scheduler action in scope.
@@ -92,11 +63,11 @@ abstract class Sync implements Syncable {
 		add_action( 'action_scheduler_completed_action', array( $this, 'maybe_trigger_last_in_group' ) );
 		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
 
-		// Hook for when all actions in the group are finished
-		add_action( $this->get_sync_name() . '/finish', array( $this, 'on_finish' ) );
-
 		// Hook for per-action completion
-		add_action( $this->get_sync_name() . '/complete', array( $this, 'handle_per_action_complete' ), 10, 2 );
+		add_action( $this->get_sync_name() . '/complete', array( $this, 'handle_complete' ), 10, 2 );
+
+		// If Sync finish execute after sync complete
+		add_action( $this->get_sync_name() . '/finish', array( $this, 'on_finish' ) );
 
 		// Hookup to error handling if on_fail is present in child
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
@@ -206,19 +177,9 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
-		// avoid recursion by not hooking lifecycle actions
-		$sync_name           = $this->get_sync_name();
-		$lifecycle_hooks     = array( '/complete', '/finish' );
-		$is_lifecycle_action = false;
-
-		foreach ( $lifecycle_hooks as $hook_suffix ) {
-			if ( $action->get_hook() === $sync_name . $hook_suffix ) {
-				$is_lifecycle_action = true;
-				break;
-			}
-		}
-
-		if ( $is_lifecycle_action ) {
+		// avoid recursion by not hooking a complete action while
+		// in complete context
+		if ( $action->get_hook() === $this->get_sync_name() . '/complete' ) {
 			return;
 		}
 
@@ -236,9 +197,8 @@ abstract class Sync implements Syncable {
 
 		// Check if action of the same group is running or pending
 		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
-		if ( count( $actions ) === 0 && ! $this->finish_hook_fired ) {
-			$this->finish_hook_fired = true;
-			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name(), $action_id );
+		if ( count( $actions ) === 0 ) {
+			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
 		}
 	}
 
@@ -419,6 +379,21 @@ abstract class Sync implements Syncable {
 	}
 
 	/**
+	 * Handles per-action completion events.
+	 *
+	 * This method is called for every sync-owned action that completes successfully,
+	 * including chunk and dispatcher actions. It can be extended in child classes
+	 * to implement custom per-action completion logic.
+	 *
+	 * @param ActionScheduler_Action $action The completed action.
+	 * @param int                    $action_id The ID of the completed action.
+	 * @return void
+	 */
+	public function handle_complete( ActionScheduler_Action $action, int $action_id ): void {
+		// No-op placeholder. Child classes can override to add custom logic.
+	}
+
+	/**
 	 * Executes tasks after all actions in the synchronization group are finished.
 	 *
 	 * This method is triggered when all actions in the sync group have completed.
@@ -433,7 +408,7 @@ abstract class Sync implements Syncable {
 	/**
 	 * Executes tasks after the synchronization process is complete.
 	 *
-	 * @deprecated Use on_finish() instead. This method will be removed in a future version.
+	 * @deprecated Use on_finish() instead.
 	 *
 	 * This method is triggered upon the completion of a synchronization process.
 	 * It can perform cleanup tasks, post-sync operations, or finalize other processes tied to the sync group.
@@ -443,48 +418,7 @@ abstract class Sync implements Syncable {
 	 * @return void
 	 */
 	public function on_complete(): void {
-		// Only show deprecation warning once per request
-		if ( ! self::$deprecation_warning_shown ) {
-			self::$deprecation_warning_shown = true;
-			trigger_error( 'on_complete() is deprecated. Use on_finish() instead.', E_USER_DEPRECATED );
-		}
-
-		// Use cached reflection results for performance
-		$class_name = static::class;
-		if ( ! isset( self::$override_cache[ $class_name ] ) ) {
-			$reflection         = new \ReflectionClass( $this );
-			$on_finish_method   = $reflection->getMethod( 'on_finish' );
-			$on_complete_method = $reflection->getMethod( 'on_complete' );
-
-			// Cache whether child overrides on_finish
-			self::$override_cache[ $class_name ] = array(
-				'finish_overridden'   => $on_finish_method->getDeclaringClass()->getName() !== __CLASS__,
-				'complete_overridden' => $on_complete_method->getDeclaringClass()->getName() !== __CLASS__,
-			);
-		}
-
-		// If child overrides on_finish(), call it (unless we're already in it)
-		if ( self::$override_cache[ $class_name ]['finish_overridden'] ) {
-			$this->on_finish();
-		} elseif ( self::$override_cache[ $class_name ]['complete_overridden'] ) {
-			// If child overrides on_complete() but not on_finish(), we're already in the child's implementation
-			// Do nothing to avoid infinite recursion
-		}
-	}
-
-	/**
-	 * Handles per-action completion events.
-	 *
-	 * This method is called for every sync-owned action that completes successfully,
-	 * including chunk and dispatcher actions. It can be extended in child classes
-	 * to implement custom per-action completion logic.
-	 *
-	 * @param ActionScheduler_Action $action The completed action.
-	 * @param int                    $action_id The ID of the completed action.
-	 * @return void
-	 */
-	public function handle_per_action_complete( ActionScheduler_Action $action, int $action_id ): void {
-		// No-op placeholder. Child classes can override to add custom logic.
+		$this->on_finish();
 	}
 
 	/**
