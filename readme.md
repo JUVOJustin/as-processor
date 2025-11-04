@@ -57,3 +57,171 @@ This library is an excellent choice for WordPress developers and enterprises dea
 - Frequent e-commerce product imports
 
 AS Processor combines the power of modern WordPress development practices, Action Scheduler's asynchronous processing capabilities, and a highly abstracted framework to enable seamless and fault-tolerant data processing at scale. It offers developers a solid foundation for building efficient, scalable synchronization solutions tailored to their applications' unique requirements.
+
+---
+
+## Sync Lifecycle Hooks
+
+The `Sync` class provides a comprehensive set of lifecycle hooks that allow you to monitor and respond to various stages of the synchronization process. These hooks are namespaced by your sync name (as returned by `get_sync_name()`).
+
+### Available Hooks
+
+#### `{sync_name}/start`
+**When**: Fired when an action begins execution  
+**Parameters**: None (triggered via `track_action_start`)  
+**Use case**: Log the start of processing, set up temporary resources, or track progress
+
+#### `{sync_name}/complete`
+**When**: Fired for **each** sync-owned action upon successful completion  
+**Parameters**: 
+- `ActionScheduler_Action $action` - The completed action object
+- `int $action_id` - The ID of the completed action
+
+**Use case**: Track individual action completions, update progress indicators, or perform per-action cleanup
+
+#### `{sync_name}/finish`
+**When**: Fired **once** when all actions in the sync group are complete  
+**Parameters**:
+- `string $group_name` - The sync group name
+- `int $action_id` - The ID of the last completed action
+
+**Use case**: Final cleanup, send completion notifications, or trigger dependent processes
+
+#### `{sync_name}/fail`
+**When**: Fired when an action encounters an exception during execution  
+**Parameters**:
+- `ActionScheduler_Action $action` - The failed action object
+- `Exception $e` - The exception that was thrown
+- `int $action_id` - The ID of the failed action
+
+**Use case**: Error logging, send failure notifications, or trigger recovery processes
+
+#### `{sync_name}/cancel`
+**When**: Fired when an action is manually cancelled  
+**Parameters**:
+- `ActionScheduler_Action $action` - The cancelled action object
+- `int $action_id` - The ID of the cancelled action
+
+**Use case**: Clean up resources, log cancellation events
+
+#### `{sync_name}/timeout`
+**When**: Fired when an action times out  
+**Parameters**:
+- `ActionScheduler_Action $action` - The timed-out action object
+- `int $action_id` - The ID of the timed-out action
+
+**Use case**: Handle timeout scenarios, log timeout events, retry logic
+
+### Hook Usage Example
+
+```php
+// Hook into a specific sync's lifecycle events
+add_action( 'my_custom_sync/complete', function( $action, $action_id ) {
+    error_log( "Action $action_id completed successfully" );
+}, 10, 2 );
+
+add_action( 'my_custom_sync/finish', function( $group_name, $action_id ) {
+    error_log( "All actions in group $group_name are finished!" );
+    // Perform final cleanup or send notifications
+}, 10, 2 );
+
+add_action( 'my_custom_sync/fail', function( $action, $exception, $action_id ) {
+    error_log( "Action $action_id failed: " . $exception->getMessage() );
+}, 10, 3 );
+```
+
+### Overridable Methods
+
+Instead of using hooks, you can override these methods in your child class:
+
+#### `on_finish()`
+Called when all actions in the sync group are complete. This is the preferred method for implementing group completion logic.
+
+```php
+public function on_finish(): void {
+    // Your completion logic here
+}
+```
+
+#### `handle_per_action_complete( ActionScheduler_Action $action, int $action_id )`
+Called for each action that completes successfully.
+
+```php
+public function handle_per_action_complete( ActionScheduler_Action $action, int $action_id ): void {
+    // Your per-action completion logic here
+}
+```
+
+#### `on_fail()`
+Called when an action fails.
+
+```php
+public function on_fail(): void {
+    // Your failure handling logic here
+}
+```
+
+---
+
+## Migration Guide
+
+### Migrating from `on_complete()` to `on_finish()`
+
+**Important**: The `on_complete()` method has been deprecated in favor of the new lifecycle hook system.
+
+#### What Changed?
+
+1. **New Hook Semantics**:
+   - `{sync_name}/complete` now fires **per-action** (for every completed action in the sync)
+   - `{sync_name}/finish` now fires **once** when all actions are complete (previous behavior of `/complete`)
+
+2. **Method Rename**:
+   - `on_complete()` → `on_finish()` (same behavior, just renamed for clarity)
+
+#### Migration Steps
+
+**If you override `on_complete()` in your child class:**
+
+```php
+// OLD (deprecated)
+public function on_complete(): void {
+    // Your completion logic
+}
+
+// NEW (recommended)
+public function on_finish(): void {
+    // Your completion logic (same code)
+}
+```
+
+**If you hook into `{sync_name}/complete` externally:**
+
+```php
+// OLD (will now fire for EVERY action)
+add_action( 'my_sync/complete', function( $group_name ) {
+    // This was called once when all actions finished
+});
+
+// NEW (fires once when all actions are finished)
+add_action( 'my_sync/finish', function( $group_name, $action_id ) {
+    // This is called once when all actions finished
+}, 10, 2 );
+
+// OR use the new per-action hook if needed
+add_action( 'my_sync/complete', function( $action, $action_id ) {
+    // This is called for EACH completed action
+}, 10, 2 );
+```
+
+#### Backward Compatibility
+
+The library maintains backward compatibility:
+- The `on_complete()` method still exists and will automatically call `on_finish()` if it's overridden
+- A deprecation warning (`E_USER_DEPRECATED`) is triggered only when `on_complete()` is actually executed
+- You have time to migrate, but should do so to avoid future issues
+
+#### Breaking Changes
+
+⚠️ **External hooks on `{sync_name}/complete` will now fire multiple times** (once per action instead of once per group). If you have external code hooking into this, you **must** update it to use `{sync_name}/finish` for group-completion behavior.
+
+---
