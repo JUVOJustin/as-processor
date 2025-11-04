@@ -58,6 +58,13 @@ abstract class Sync implements Syncable {
 	private static bool $deprecation_warning_shown = false;
 
 	/**
+	 * Cache for reflection check to avoid repeated reflection calls
+	 *
+	 * @var array<string, bool>
+	 */
+	private static array $override_cache = array();
+
+	/**
 	 * ID of the action scheduler action in scope.
 	 *
 	 * @var int
@@ -433,15 +440,24 @@ abstract class Sync implements Syncable {
 			trigger_error( 'on_complete() is deprecated. Use on_finish() instead.', E_USER_DEPRECATED );
 		}
 
-		// Check if child class overrides on_finish() - if so, call that instead
-		$reflection        = new \ReflectionClass( $this );
-		$on_finish_method  = $reflection->getMethod( 'on_finish' );
-		$on_complete_method = $reflection->getMethod( 'on_complete' );
+		// Use cached reflection results for performance
+		$class_name = static::class;
+		if ( ! isset( self::$override_cache[ $class_name ] ) ) {
+			$reflection         = new \ReflectionClass( $this );
+			$on_finish_method   = $reflection->getMethod( 'on_finish' );
+			$on_complete_method = $reflection->getMethod( 'on_complete' );
+
+			// Cache whether child overrides on_finish
+			self::$override_cache[ $class_name ] = array(
+				'finish_overridden'   => $on_finish_method->getDeclaringClass()->getName() !== __CLASS__,
+				'complete_overridden' => $on_complete_method->getDeclaringClass()->getName() !== __CLASS__,
+			);
+		}
 
 		// If child overrides on_finish(), call it (unless we're already in it)
-		if ( $on_finish_method->getDeclaringClass()->getName() !== self::class ) {
+		if ( self::$override_cache[ $class_name ]['finish_overridden'] ) {
 			$this->on_finish();
-		} elseif ( $on_complete_method->getDeclaringClass()->getName() !== self::class ) {
+		} elseif ( self::$override_cache[ $class_name ]['complete_overridden'] ) {
 			// If child overrides on_complete() but not on_finish(), we're already in the child's implementation
 			// Do nothing to avoid infinite recursion
 		}

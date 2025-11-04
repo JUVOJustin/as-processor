@@ -116,7 +116,7 @@ class SyncLifecycleTest extends TestCase {
 			return $prop->getName();
 		}, $properties );
 
-		$this->assertContains( 'finish_hook_fired', $property_names, 'finish_hook_fired property should exist' );
+		$this->assertTrue( in_array( 'finish_hook_fired', $property_names, true ), 'finish_hook_fired property should exist' );
 	}
 
 	/**
@@ -130,7 +130,7 @@ class SyncLifecycleTest extends TestCase {
 			return $prop->getName();
 		}, $properties );
 
-		$this->assertContains( 'deprecation_warning_shown', $property_names, 'deprecation_warning_shown property should exist' );
+		$this->assertTrue( in_array( 'deprecation_warning_shown', $property_names, true ), 'deprecation_warning_shown property should exist' );
 	}
 
 	/**
