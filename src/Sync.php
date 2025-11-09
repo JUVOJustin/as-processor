@@ -43,6 +43,8 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  *   Parameters: ActionScheduler_Action $action, int $action_id
  * - `{sync_name}/cancel` - Fires when an action is cancelled
  *   Parameters: ActionScheduler_Action $action, int $action_id
+ * - `{sync_name}/delete` - Fires when an action is deleted
+ *   Parameters: ActionScheduler_Action $action, int $action_id
  *
  * ## Overridable Methods
  *
@@ -98,6 +100,7 @@ abstract class Sync implements Syncable {
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
 		add_action( 'action_scheduler_canceled_action', array( $this, 'handle_cancel' ), 10 );
 		add_action( 'action_scheduler_failed_execution', array( $this, 'handle_exception' ), 10, 2 );
+		add_action( 'action_scheduler_deleted_action', array( $this, 'handle_delete' ), 10 );
 
 		// If Sync failed execute on_fail
 		add_action( $this->get_sync_name() . '/fail', array( $this, 'on_fail' ) );
@@ -370,6 +373,36 @@ abstract class Sync implements Syncable {
 		}
 
 		do_action( $this->get_sync_name() . '/cancel', $action, $action_id );
+	}
+
+	/**
+	 * Handles the deletion of an action.
+	 *
+	 * Marks the chunk associated with the action as deleted, records the end time,
+	 * and triggers a custom action for deletion.
+	 *
+	 * @param int $action_id The ID of the action that was deleted.
+	 * @return void
+	 * @throws Exception DB Error.
+	 */
+	public function handle_delete( int $action_id ): void {
+
+		// Check if action belongs to sync
+		$action = $this->action_belongs_to_sync( $action_id );
+		if ( ! $action || empty( $action->get_group() ) ) {
+			return;
+		}
+
+		// set the end time of the chunk
+		$action_arguments = $action->get_args();
+		if ( ! empty( $action_arguments['chunk_id'] ) ) {
+			$chunk = new Chunk( $action_arguments['chunk_id'] );
+			$chunk->set_status( ProcessStatus::DELETED );
+			$chunk->set_end();
+			$chunk->save();
+		}
+
+		do_action( $this->get_sync_name() . '/delete', $action, $action_id );
 	}
 
 	/**
