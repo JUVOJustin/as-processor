@@ -20,4 +20,5 @@ enum ProcessStatus: string {
 	case FAILED    = 'failed';
 	case CANCELLED = 'cancelled';
 	case TIMED_OUT = 'timed-out';
+	case DELETED   = 'deleted';
 }

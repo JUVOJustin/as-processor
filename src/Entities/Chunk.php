@@ -413,6 +413,10 @@ class Chunk implements JsonSerializable {
 			$chunk->set_end( Helper::convert_microtime_to_datetime( $data['end'] ) );
 		}
 
+		if ( ! empty( $data['group'] ) ) {
+			$chunk->set_group( $data['group'] );
+		}
+
 		return $chunk;
 	}
 
