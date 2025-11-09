@@ -105,8 +105,6 @@ abstract class Import extends Sync {
 		// Check if action of the same group is running or pending
 		$completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
 
-		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
-
 		// Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
 		if (
 			$completed
