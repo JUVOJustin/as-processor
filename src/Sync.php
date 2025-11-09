@@ -100,7 +100,7 @@ abstract class Sync implements Syncable {
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
 		add_action( 'action_scheduler_canceled_action', array( $this, 'handle_cancel' ), 10 );
 		add_action( 'action_scheduler_failed_execution', array( $this, 'handle_exception' ), 10, 2 );
-		add_action( 'action_scheduler_deleted_action', array( $this, 'handle_delete' ), 10 );
+		add_action( 'action_scheduler_deleted_action', array( $this, 'handle_delete' ) );
 
 		// If Sync failed execute on_fail
 		add_action( $this->get_sync_name() . '/fail', array( $this, 'on_fail' ) );
@@ -379,7 +379,8 @@ abstract class Sync implements Syncable {
 	 * Handles the deletion of an action.
 	 *
 	 * Marks the chunk associated with the action as deleted, records the end time,
-	 * and triggers a custom action for deletion.
+	 * and triggers a custom action for deletion. This is called, when the action is already deleted.
+	 * Looking action details up is not possible. That is why the chunk is passed instead.
 	 *
 	 * @param int $action_id The ID of the action that was deleted.
 	 * @return void
@@ -387,22 +388,18 @@ abstract class Sync implements Syncable {
 	 */
 	public function handle_delete( int $action_id ): void {
 
-		// Check if action belongs to sync
-		$action = $this->action_belongs_to_sync( $action_id );
-		if ( ! $action ) {
+		// Since the action is already deleted, we can only check if it belongs to sync via the chunk DB.
+		// This will not work for the dispatcher actions, but those do not have chunks anyway.
+		$chunk = Chunk_DB::db()->get_chunk_by_action_id( $action_id );
+		if ( ! $chunk || $chunk->get_status() === ProcessStatus::DELETED ) {
 			return;
 		}
 
-		// set the end time of the chunk
-		$action_arguments = $action->get_args();
-		if ( ! empty( $action_arguments['chunk_id'] ) ) {
-			$chunk = new Chunk( $action_arguments['chunk_id'] );
-			$chunk->set_status( ProcessStatus::DELETED );
-			$chunk->set_end();
-			$chunk->save();
-		}
+		$chunk->set_status( ProcessStatus::DELETED );
+		$chunk->set_end();
+		$chunk->save();
 
-		do_action( $this->get_sync_name() . '/delete', $action, $action_id );
+		do_action( $this->get_sync_name() . '/delete', $chunk );
 	}
 
 	/**
