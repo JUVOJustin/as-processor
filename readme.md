@@ -49,6 +49,18 @@ The **AS Processor** library is a robust synchronization and data chunking frame
 4. **Action Scheduler Integration**:
     - Uses the Action Scheduler's event-driven architecture to manage background tasks effectively, along with group-level synchronization to maintain context-aware processing.
 
+### Available Lifecycle Hooks
+The library provides several WordPress action hooks that fire during the synchronization lifecycle, allowing developers to hook into different stages of the sync process:
+
+- **`{sync_name}/start`**: Fires when any Action Scheduler action belonging to the sync begins execution (both dispatcher/root actions and chunk processing actions). Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
+- **`{sync_name}/process_chunk`**: Fires to process an individual chunk. Receives `int $chunk_id` as parameter.
+- **`{sync_name}/complete`**: Fires when all actions in the sync group have completed successfully. Receives `string $sync_group_name` as parameter.
+- **`{sync_name}/fail`**: Fires when an action fails with an exception. Receives `ActionScheduler_Action $action`, `Exception $e`, and `int $action_id` as parameters.
+- **`{sync_name}/timeout`**: Fires when an action times out. Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
+- **`{sync_name}/cancel`**: Fires when an action is canceled. Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
+
+These hooks enable custom implementations for metrics tracking, logging, notifications, or other side effects at different stages of the synchronization process.
+
 ### Ideal For
 This library is an excellent choice for WordPress developers and enterprises dealing with:
 - High-volume data integration from various sources.

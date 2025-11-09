@@ -88,14 +88,13 @@ abstract class Sync implements Syncable {
 	 * @return void
 	 */
 	public function set_hooks(): void {
-		add_action( 'action_scheduler_begin_execute', array( $this, 'track_action_start' ), 10, 1 );
-		add_action( 'action_scheduler_completed_action', array( $this, 'handle_complete' ) );
 		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
 
 		// If Sync finish execute after sync complete
 		add_action( $this->get_sync_name() . '/finish', array( $this, 'on_finish' ) );
 
-		// Hookup to error handling if on_fail is present in child
+		add_action( 'action_scheduler_begin_execute', array( $this, 'handle_start' ), 10, 1 );
+    add_action( 'action_scheduler_completed_action', array( $this, 'handle_complete' ), 10, 1 );
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
 		add_action( 'action_scheduler_canceled_action', array( $this, 'handle_cancel' ), 10 );
 		add_action( 'action_scheduler_failed_execution', array( $this, 'handle_exception' ), 10, 2 );
@@ -237,13 +236,16 @@ abstract class Sync implements Syncable {
 	 * Runs when an action is started.
 	 *
 	 * Callback for "action_scheduler_before_execute" hook. It gets the current action and (re)sets the group name.
-	 * This is needed to have a consistent group name through all executions of a group
+	 * This is needed to have a consistent group name through all executions of a group.
+	 *
+	 * Fires a '{sync_name}/start' action hook with the ActionScheduler_Action object and action ID as parameters,
+	 * allowing external code to hook into the start of any sync-related action (both dispatcher and chunk actions).
 	 *
 	 * @param int $action_id ID of the action to track.
 	 * @return void
 	 * @throws Exception DB Error.
 	 */
-	public function track_action_start( int $action_id ): void {
+	public function handle_start( int $action_id ): void {
 		$action = $this->action_belongs_to_sync( $action_id );
 		if ( ! $action || empty( $action->get_group() ) ) {
 			return;
@@ -259,6 +261,8 @@ abstract class Sync implements Syncable {
 			$chunk->set_start();
 			$chunk->save();
 		}
+
+		do_action( $this->get_sync_name() . '/start', $action, $action_id );
 	}
 
 	/**
