@@ -69,3 +69,99 @@ This library is an excellent choice for WordPress developers and enterprises dea
 - Frequent e-commerce product imports
 
 AS Processor combines the power of modern WordPress development practices, Action Scheduler's asynchronous processing capabilities, and a highly abstracted framework to enable seamless and fault-tolerant data processing at scale. It offers developers a solid foundation for building efficient, scalable synchronization solutions tailored to their applications' unique requirements.
+
+---
+
+## Sync Lifecycle Hooks
+
+The `Sync` class provides a comprehensive set of lifecycle hooks that allow you to monitor and respond to various stages of the synchronization process. These hooks are namespaced by your sync name (as returned by `get_sync_name()`).
+
+### Available Hooks
+
+#### `{sync_name}/start`
+**When**: Fired when an action begins execution  
+**Parameters**: None (triggered via `track_action_start`)  
+**Use case**: Log the start of processing, set up temporary resources, or track progress
+
+#### `{sync_name}/complete`
+**When**: Fired for **each** sync-owned action upon successful completion (triggered by Action Scheduler's native `action_scheduler_completed_action` hook)  
+**Parameters**: 
+- `ActionScheduler_Action $action` - The completed action object
+- `int $action_id` - The ID of the action
+
+**Use case**: Track individual action completions, update progress indicators, or perform per-action cleanup
+
+**Note**: This hook fires **every time** an action in your sync group completes. If your sync schedules 100 chunks, this hook will fire 100 times. Use this for per-action tracking, not for final completion logic (use `/finish` for that).
+
+#### `{sync_name}/finish`
+**When**: Fired **once** when all actions in the sync group are complete  
+**Parameters**:
+- `string $group_name` - The sync group name
+
+**Use case**: Final cleanup, send completion notifications, or trigger dependent processes
+
+#### `{sync_name}/fail`
+**When**: Fired when an action encounters an exception during execution  
+**Parameters**:
+- `ActionScheduler_Action $action` - The failed action object
+- `Exception $e` - The exception that was thrown
+- `int $action_id` - The ID of the failed action
+
+**Use case**: Error logging, send failure notifications, or trigger recovery processes
+
+#### `{sync_name}/cancel`
+**When**: Fired when an action is manually cancelled  
+**Parameters**:
+- `ActionScheduler_Action $action` - The cancelled action object
+- `int $action_id` - The ID of the cancelled action
+
+**Use case**: Clean up resources, log cancellation events
+
+#### `{sync_name}/timeout`
+**When**: Fired when an action times out  
+**Parameters**:
+- `ActionScheduler_Action $action` - The timed-out action object
+- `int $action_id` - The ID of the timed-out action
+
+**Use case**: Handle timeout scenarios, log timeout events, retry logic
+
+### Hook Usage Example
+
+```php
+// Track progress for each completed action
+add_action( 'my_custom_sync/complete', function( $action, $action_id ) {
+    error_log( "Action $action_id completed. Belongs to group {$action->get_group()}." );
+}, 10, 1 );
+
+// Final cleanup when ALL actions are finished
+add_action( 'my_custom_sync/finish', function( $group_name ) {
+    error_log( "All actions in group $group_name are finished!" );
+ } );
+
+// Handle failures
+add_action( 'my_custom_sync/fail', function( $action, $exception, $action_id ) {
+    error_log( "Action $action_id failed: " . $exception->getMessage() );
+}, 10, 3 );
+```
+
+### Overridable Methods
+
+Instead of using hooks, you can override these methods in your child class:
+
+#### `on_finish()`
+Called when all actions in the sync group are complete. This is the preferred method for implementing group completion logic.
+
+```php
+public function on_finish(): void {
+    // Your completion logic here
+}
+```
+
+#### `on_fail()`
+Called when an action fails.
+
+```php
+public function on_fail(): void {
+    // Your failure handling logic here
+}
+```

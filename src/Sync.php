@@ -19,9 +19,38 @@ use juvo\AS_Processor\Entities\ProcessStatus;
 
 /**
  * Abstract base class for managing synchronization processes utilizing Action Scheduler.
+ *
  * This class initializes hooks, processes actions in chunks, handles errors, and manages
  * group naming and lifecycle for synchronization tasks. It provides structure and methods
  * for scheduling, tracking, and completing chunks within a synchronization process.
+ *
+ * ## Lifecycle Hooks
+ *
+ * The Sync class provides several lifecycle hooks that fire at different stages:
+ *
+ * ### Per-Action Hooks
+ * - `{sync_name}/complete` - Fires for each completed action in the sync group
+ *   Parameters: int $action_id
+ *
+ * ### Group-Level Hooks
+ * - `{sync_name}/finish` - Fires once when all actions in the group are complete
+ *   Parameters: string $group_name
+ *
+ * ### Error Hooks
+ * - `{sync_name}/fail` - Fires when an action fails with an exception
+ *   Parameters: ActionScheduler_Action $action, Exception $e, int $action_id
+ * - `{sync_name}/timeout` - Fires when an action times out
+ *   Parameters: ActionScheduler_Action $action, int $action_id
+ * - `{sync_name}/cancel` - Fires when an action is cancelled
+ *   Parameters: ActionScheduler_Action $action, int $action_id
+ *
+ * ## Overridable Methods
+ *
+ * Child classes can override these methods to customize behavior:
+ * - `on_finish()` - Called when all actions complete
+ * - `on_fail()` - Called when an action fails
+ *
+ * @package juvo/as-processor
  */
 abstract class Sync implements Syncable {
 
@@ -59,14 +88,13 @@ abstract class Sync implements Syncable {
 	 * @return void
 	 */
 	public function set_hooks(): void {
-		add_action( 'action_scheduler_begin_execute', array( $this, 'handle_start' ), 10, 1 );
-		add_action( 'action_scheduler_completed_action', array( $this, 'maybe_trigger_last_in_group' ) );
 		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
 
-		// If Sync complete execute after sync complete
-		add_action( $this->get_sync_name() . '/complete', array( $this, 'on_complete' ) );
+		// If Sync finish execute after sync complete
+		add_action( $this->get_sync_name() . '/finish', array( $this, 'on_finish' ) );
 
-		// Hookup to error handling if on_fail is present in child
+		add_action( 'action_scheduler_begin_execute', array( $this, 'handle_start' ), 10, 1 );
+		add_action( 'action_scheduler_completed_action', array( $this, 'handle_complete' ), 10, 1 );
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
 		add_action( 'action_scheduler_canceled_action', array( $this, 'handle_cancel' ), 10 );
 		add_action( 'action_scheduler_failed_execution', array( $this, 'handle_exception' ), 10, 2 );
@@ -158,16 +186,21 @@ abstract class Sync implements Syncable {
 	}
 
 	/**
-	 * Runs when an action is completed.
+	 * Handles per-action completion events for actions in the sync group.
 	 *
-	 * Checks if there are more remaining jobs in the queue or if this is the last one.
-	 * This can be used to add additional cleanup jobs
+	 * This method is called by Action Scheduler's native `action_scheduler_completed_action` hook
+	 * whenever any action completes. It:
+	 * 1. Verifies the action belongs to this sync
+	 * 2. Updates the chunk status to FINISHED
+	 * 3. Fires the per-action `{sync_name}/complete` hook (passes ActionScheduler_Action object)
+	 * 4. Checks if all actions in the group are done
+	 * 5. If all complete, fires the `{sync_name}/finish` hook once
 	 *
-	 * @param int $action_id ID of the action to check.
+	 * @param int $action_id ID of the completed action.
 	 * @return void
 	 * @throws Exception DB Error.
 	 */
-	public function maybe_trigger_last_in_group( int $action_id ): void {
+	public function handle_complete( int $action_id ): void {
 
 		$action = $this->action_belongs_to_sync( $action_id );
 		if ( ! $action || empty( $action->get_group() ) ) {
@@ -189,10 +222,13 @@ abstract class Sync implements Syncable {
 			$chunk->save();
 		}
 
+		// Fire per-action completion hook
+		do_action( $this->get_sync_name() . '/complete', $action, $action_id );
+
 		// Check if action of the same group is running or pending
 		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
 		if ( count( $actions ) === 0 ) {
-			do_action( $this->get_sync_name() . '/complete', $this->get_sync_group_name() );
+			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
 		}
 	}
 
@@ -378,7 +414,21 @@ abstract class Sync implements Syncable {
 	}
 
 	/**
+	 * Executes tasks after all actions in the synchronization group are finished.
+	 *
+	 * This method is triggered when all actions in the sync group have completed.
+	 * It can perform cleanup tasks, post-sync operations, or finalize other processes tied to the sync group.
+	 *
+	 * Intention is to overwrite this method in child classes to ease implementation.
+	 *
+	 * @return void
+	 */
+	public function on_finish(): void {}
+
+	/**
 	 * Executes tasks after the synchronization process is complete.
+	 *
+	 * @deprecated Use on_finish() instead.
 	 *
 	 * This method is triggered upon the completion of a synchronization process.
 	 * It can perform cleanup tasks, post-sync operations, or finalize other processes tied to the sync group.
@@ -387,7 +437,9 @@ abstract class Sync implements Syncable {
 	 *
 	 * @return void
 	 */
-	public function on_complete(): void {}
+	public function on_complete(): void {
+		$this->on_finish();
+	}
 
 	/**
 	 * Handles the behavior when an action fails.
