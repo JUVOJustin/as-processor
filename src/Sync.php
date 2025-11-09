@@ -43,6 +43,8 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  *   Parameters: ActionScheduler_Action $action, int $action_id
  * - `{sync_name}/cancel` - Fires when an action is cancelled
  *   Parameters: ActionScheduler_Action $action, int $action_id
+ * - `{sync_name}/delete` - Fires when an action is deleted
+ *   Parameters: Chunk $chunk
  *
  * ## Overridable Methods
  *
@@ -98,6 +100,7 @@ abstract class Sync implements Syncable {
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
 		add_action( 'action_scheduler_canceled_action', array( $this, 'handle_cancel' ), 10 );
 		add_action( 'action_scheduler_failed_execution', array( $this, 'handle_exception' ), 10, 2 );
+		add_action( 'action_scheduler_deleted_action', array( $this, 'handle_delete' ) );
 
 		// If Sync failed execute on_fail
 		add_action( $this->get_sync_name() . '/fail', array( $this, 'on_fail' ) );
@@ -370,6 +373,33 @@ abstract class Sync implements Syncable {
 		}
 
 		do_action( $this->get_sync_name() . '/cancel', $action, $action_id );
+	}
+
+	/**
+	 * Handles the deletion of an action.
+	 *
+	 * Marks the chunk associated with the action as deleted, records the end time,
+	 * and triggers a custom action for deletion. This is called, when the action is already deleted.
+	 * Looking action details up is not possible. That is why the chunk is passed instead.
+	 *
+	 * @param int $action_id The ID of the action that was deleted.
+	 * @return void
+	 * @throws Exception DB Error.
+	 */
+	public function handle_delete( int $action_id ): void {
+
+		// Since the action is already deleted, we can only check if it belongs to sync via the chunk DB.
+		// This will not work for the dispatcher actions, but those do not have chunks anyway.
+		$chunk = Chunk_DB::db()->get_chunk_by_action_id( $action_id );
+		if ( ! $chunk || $chunk->get_status() === ProcessStatus::DELETED ) {
+			return;
+		}
+
+		$chunk->set_status( ProcessStatus::DELETED );
+		$chunk->set_end();
+		$chunk->save();
+
+		do_action( $this->get_sync_name() . '/delete', $chunk );
 	}
 
 	/**

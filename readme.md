@@ -58,6 +58,7 @@ The library provides several WordPress action hooks that fire during the synchro
 - **`{sync_name}/fail`**: Fires when an action fails with an exception. Receives `ActionScheduler_Action $action`, `Exception $e`, and `int $action_id` as parameters.
 - **`{sync_name}/timeout`**: Fires when an action times out. Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
 - **`{sync_name}/cancel`**: Fires when an action is canceled. Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
+- **`{sync_name}/delete`**: Fires when an action is deleted. Receives `Chunk $chunk` as parameter.
 
 These hooks enable custom implementations for metrics tracking, logging, notifications, or other side effects at different stages of the synchronization process.
 
@@ -117,6 +118,13 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 
 **Use case**: Clean up resources, log cancellation events
 
+#### `{sync_name}/delete`
+**When**: Fired when an action is deleted  
+**Parameters**:
+- `Chunk $chunk` - The chunk belonging to the deleted action
+
+**Use case**: Track deleted actions, clean up resources, log deletion events
+
 #### `{sync_name}/timeout`
 **When**: Fired when an action times out  
 **Parameters**:
@@ -142,6 +150,11 @@ add_action( 'my_custom_sync/finish', function( $group_name ) {
 add_action( 'my_custom_sync/fail', function( $action, $exception, $action_id ) {
     error_log( "Action $action_id failed: " . $exception->getMessage() );
 }, 10, 3 );
+
+// Handle deletions
+add_action( 'my_custom_sync/delete', function( $chunk ) {
+    error_log( "Action {$chunk->get_action_id()} was deleted." );
+} );
 ```
 
 ### Overridable Methods

@@ -76,6 +76,17 @@ class Chunk_DB extends Base_DB {
 	}
 
 	/**
+	 * Retrieve a chunk by its action_id.
+	 *
+	 * @param int $action_id The action ID of the chunk to retrieve.
+	 * @return ?Chunk Chunk if found, or null does not exist.
+	 */
+	public function get_chunk_by_action_id( int $action_id ): ?Chunk {
+		$query = $this->db->prepare( "SELECT * FROM {$this->get_table_name()} WHERE action_id = %d", $action_id );
+		return $this->get_chunk( $query );
+	}
+
+	/**
 	 * Retrieves a single Chunk from a DB query.
 	 *
 	 * @param string $query The SQL Query to get the Chunk from.
