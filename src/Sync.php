@@ -224,7 +224,7 @@ abstract class Sync implements Syncable {
 		}
 
 		// Fire per-action completion hook
-		do_action( $this->get_sync_name() . '/complete', $action );
+		do_action( $this->get_sync_name() . '/complete', $action, $action_id );
 
 		// Check if action of the same group is running or pending
 		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
