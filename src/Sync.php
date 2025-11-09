@@ -389,7 +389,7 @@ abstract class Sync implements Syncable {
 
 		// Check if action belongs to sync
 		$action = $this->action_belongs_to_sync( $action_id );
-		if ( ! $action || empty( $action->get_group() ) ) {
+		if ( ! $action ) {
 			return;
 		}
 
