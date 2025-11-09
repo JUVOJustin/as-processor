@@ -40,7 +40,7 @@ abstract class CSV extends Import
         }
 
         // Read csv from file
-        $reader = Reader::createFromPath($this->get_source_path(), 'r');
+        $reader = Reader::from($this->get_source_path(), 'r');
         $reader->setDelimiter($this->delimiter);
 
         // If src encoding is set convert table to utf-8
