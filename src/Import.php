@@ -11,7 +11,9 @@
 
 namespace juvo\AS_Processor;
 
+use ActionScheduler_Store;
 use Exception;
+use juvo\AS_Processor\DB\Chunk_DB;
 
 /**
  * Abstract class for managing data imports with support for chunking large datasets.
@@ -44,6 +46,9 @@ abstract class Import extends Sync {
 	public function set_hooks(): void {
 		parent::set_hooks();
 		add_action( $this->get_sync_name(), array( $this, 'split_data_into_chunks' ) );
+
+		add_action( $this->get_sync_name() . '/start', array( $this, 'track_scheduling_action' ), 10, 1 );
+		add_action( $this->get_sync_name() . '/complete', array( $this, 'on_complete' ), 10, 1 );
 	}
 
 	/**
@@ -68,5 +73,47 @@ abstract class Import extends Sync {
 	 */
 	public function process_chunk( int $chunk_id ): void {
 		$this->import_chunk( $chunk_id );
+	}
+
+	/**
+	 * Track the start time of the action that schedules the chunks.
+	 *
+	 * @param \ActionScheduler_Action $action
+	 * @return void
+	 * @throws Exception
+	 */
+	public function track_scheduling_action( \ActionScheduler_Action $action ): void {
+
+		if ( empty( $action->get_group() ) ) {
+			$this->update_sync_data( 'spawning_action_started_at', time() );
+		}
+	}
+
+	/**
+	 * Tracks the end time of the action that schedules the chunks and triggers the finish action if applicable.
+	 *
+	 * @param \ActionScheduler_Action $action
+	 * @return void
+	 * @throws Exception
+	 */
+	public function on_complete( \ActionScheduler_Action $action ): void {
+
+		if ( empty( $action->get_group() ) ) {
+			$this->update_sync_data( 'spawning_action_ended_at', time() );
+		}
+
+		// Check if action of the same group is running or pending
+		$completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
+
+		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
+
+		// Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
+		if (
+			$completed
+			&& $this->get_sync_data( 'spawning_action_started_at' )
+			&& $this->get_sync_data( 'spawning_action_ended_at' )
+		) {
+			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
+		}
 	}
 }
