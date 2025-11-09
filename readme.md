@@ -83,7 +83,6 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 **When**: Fired **once** when all actions in the sync group are complete  
 **Parameters**:
 - `string $group_name` - The sync group name
-- `int $action_id` - The ID of the last completed action
 
 **Use case**: Final cleanup, send completion notifications, or trigger dependent processes
 
@@ -115,15 +114,10 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 ### Hook Usage Example
 
 ```php
-// Hook into a specific sync's lifecycle events
-add_action( 'my_custom_sync/complete', function( $action, $action_id ) {
-    error_log( "Action $action_id completed successfully" );
-}, 10, 2 );
-
-add_action( 'my_custom_sync/finish', function( $group_name, $action_id ) {
+add_action( 'my_custom_sync/finish', function( $group_name ) {
     error_log( "All actions in group $group_name are finished!" );
     // Perform final cleanup or send notifications
-}, 10, 2 );
+} );
 
 add_action( 'my_custom_sync/fail', function( $action, $exception, $action_id ) {
     error_log( "Action $action_id failed: " . $exception->getMessage() );
@@ -140,15 +134,6 @@ Called when all actions in the sync group are complete. This is the preferred me
 ```php
 public function on_finish(): void {
     // Your completion logic here
-}
-```
-
-#### `handle_per_action_complete( ActionScheduler_Action $action, int $action_id )`
-Called for each action that completes successfully.
-
-```php
-public function handle_per_action_complete( ActionScheduler_Action $action, int $action_id ): void {
-    // Your per-action completion logic here
 }
 ```
 
@@ -197,20 +182,15 @@ public function on_finish(): void {
 **If you hook into `{sync_name}/complete` externally:**
 
 ```php
-// OLD (will now fire for EVERY action)
+// OLD (will not be called now)
 add_action( 'my_sync/complete', function( $group_name ) {
     // This was called once when all actions finished
 });
 
 // NEW (fires once when all actions are finished)
-add_action( 'my_sync/finish', function( $group_name, $action_id ) {
+add_action( 'my_sync/finish', function( $group_name ) {
     // This is called once when all actions finished
-}, 10, 2 );
-
-// OR use the new per-action hook if needed
-add_action( 'my_sync/complete', function( $action, $action_id ) {
-    // This is called for EACH completed action
-}, 10, 2 );
+} );
 ```
 
 #### Backward Compatibility
