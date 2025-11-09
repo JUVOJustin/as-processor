@@ -72,12 +72,14 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 **Use case**: Log the start of processing, set up temporary resources, or track progress
 
 #### `{sync_name}/complete`
-**When**: Fired for **each** sync-owned action upon successful completion  
+**When**: Fired for **each** sync-owned action upon successful completion (triggered by Action Scheduler's native `action_scheduler_completed_action` hook)  
 **Parameters**: 
 - `ActionScheduler_Action $action` - The completed action object
-- `int $action_id` - The ID of the completed action
+- `int $action_id` - The ID of the action
 
 **Use case**: Track individual action completions, update progress indicators, or perform per-action cleanup
+
+**Note**: This hook fires **every time** an action in your sync group completes. If your sync schedules 100 chunks, this hook will fire 100 times. Use this for per-action tracking, not for final completion logic (use `/finish` for that).
 
 #### `{sync_name}/finish`
 **When**: Fired **once** when all actions in the sync group are complete  
@@ -114,11 +116,17 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 ### Hook Usage Example
 
 ```php
+// Track progress for each completed action
+add_action( 'my_custom_sync/complete', function( $action, $action_id ) {
+    error_log( "Action $action_id completed. Belongs to group {$action->get_group()}." );
+}, 10, 1 );
+
+// Final cleanup when ALL actions are finished
 add_action( 'my_custom_sync/finish', function( $group_name ) {
     error_log( "All actions in group $group_name are finished!" );
-    // Perform final cleanup or send notifications
-} );
+ } );
 
+// Handle failures
 add_action( 'my_custom_sync/fail', function( $action, $exception, $action_id ) {
     error_log( "Action $action_id failed: " . $exception->getMessage() );
 }, 10, 3 );
@@ -145,63 +153,3 @@ public function on_fail(): void {
     // Your failure handling logic here
 }
 ```
-
----
-
-## Migration Guide
-
-### Migrating from `on_complete()` to `on_finish()`
-
-**Important**: The `on_complete()` method has been deprecated in favor of the new lifecycle hook system.
-
-#### What Changed?
-
-1. **New Hook Semantics**:
-   - `{sync_name}/complete` now fires **per-action** (for every completed action in the sync)
-   - `{sync_name}/finish` now fires **once** when all actions are complete (previous behavior of `/complete`)
-
-2. **Method Rename**:
-   - `on_complete()` → `on_finish()` (same behavior, just renamed for clarity)
-
-#### Migration Steps
-
-**If you override `on_complete()` in your child class:**
-
-```php
-// OLD (deprecated)
-public function on_complete(): void {
-    // Your completion logic
-}
-
-// NEW (recommended)
-public function on_finish(): void {
-    // Your completion logic (same code)
-}
-```
-
-**If you hook into `{sync_name}/complete` externally:**
-
-```php
-// OLD (will not be called now)
-add_action( 'my_sync/complete', function( $group_name ) {
-    // This was called once when all actions finished
-});
-
-// NEW (fires once when all actions are finished)
-add_action( 'my_sync/finish', function( $group_name ) {
-    // This is called once when all actions finished
-} );
-```
-
-#### Backward Compatibility
-
-The library maintains backward compatibility:
-- The `on_complete()` method still exists and will automatically call `on_finish()` if it's overridden
-- A deprecation warning (`E_USER_DEPRECATED`) is triggered only when `on_complete()` is actually executed
-- You have time to migrate, but should do so to avoid future issues
-
-#### Breaking Changes
-
-⚠️ **External hooks on `{sync_name}/complete` will now fire multiple times** (once per action instead of once per group). If you have external code hooking into this, you **must** update it to use `{sync_name}/finish` for group-completion behavior.
-
----
