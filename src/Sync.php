@@ -94,7 +94,7 @@ abstract class Sync implements Syncable {
 		add_action( $this->get_sync_name() . '/finish', array( $this, 'on_finish' ) );
 
 		add_action( 'action_scheduler_begin_execute', array( $this, 'handle_start' ), 10, 1 );
-    add_action( 'action_scheduler_completed_action', array( $this, 'handle_complete' ), 10, 1 );
+		add_action( 'action_scheduler_completed_action', array( $this, 'handle_complete' ), 10, 1 );
 		add_action( 'action_scheduler_failed_action', array( $this, 'handle_timeout' ), 10 );
 		add_action( 'action_scheduler_canceled_action', array( $this, 'handle_cancel' ), 10 );
 		add_action( 'action_scheduler_failed_execution', array( $this, 'handle_exception' ), 10, 2 );
