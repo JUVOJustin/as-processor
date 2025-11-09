@@ -189,9 +189,13 @@ abstract class Sync implements Syncable {
 	/**
 	 * Handles per-action completion events for actions in the sync group.
 	 *
-	 * Fired when any action in the sync group completes. Updates chunk status,
-	 * fires the per-action completion hook, and checks if all actions are complete
-	 * to trigger the group finish hook.
+	 * This method is called by Action Scheduler's native `action_scheduler_completed_action` hook
+	 * whenever any action completes. It:
+	 * 1. Verifies the action belongs to this sync
+	 * 2. Updates the chunk status to FINISHED
+	 * 3. Fires the per-action `{sync_name}/complete` hook (passes ActionScheduler_Action object)
+	 * 4. Checks if all actions in the group are done
+	 * 5. If all complete, fires the `{sync_name}/finish` hook once
 	 *
 	 * @param int $action_id ID of the completed action.
 	 * @return void
@@ -220,7 +224,7 @@ abstract class Sync implements Syncable {
 		}
 
 		// Fire per-action completion hook
-		do_action( $this->get_sync_name() . '/complete', $action, $action_id );
+		do_action( $this->get_sync_name() . '/complete', $action );
 
 		// Check if action of the same group is running or pending
 		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
