@@ -44,7 +44,7 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  * - `{sync_name}/cancel` - Fires when an action is cancelled
  *   Parameters: ActionScheduler_Action $action, int $action_id
  * - `{sync_name}/delete` - Fires when an action is deleted
- *   Parameters: ActionScheduler_Action $action, int $action_id
+ *   Parameters: Chunk $chunk
  *
  * ## Overridable Methods
  *
