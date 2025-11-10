@@ -78,9 +78,9 @@ abstract class Import extends Sync {
 	/**
 	 * Track the start time of the action that schedules the chunks.
 	 *
-	 * @param \ActionScheduler_Action $action
+	 * @param \ActionScheduler_Action $action The action being started.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception When sync data update fails.
 	 */
 	public function track_scheduling_action( \ActionScheduler_Action $action ): void {
 
@@ -92,9 +92,9 @@ abstract class Import extends Sync {
 	/**
 	 * Tracks the end time of the action that schedules the chunks and triggers the finish action if applicable.
 	 *
-	 * @param \ActionScheduler_Action $action
+	 * @param \ActionScheduler_Action $action The action being completed.
 	 * @return void
-	 * @throws Exception
+	 * @throws Exception When sync data update or retrieval fails.
 	 */
 	public function on_complete( \ActionScheduler_Action $action ): void {
 
