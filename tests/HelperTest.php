@@ -96,6 +96,27 @@ class HelperTest extends TestCase
 				false,
 				[123, 1234, 12345, 456, 4567, 45678]
 			],
+			'Flat array with custom numeric keys' => [
+				[100 => 'value1', 200 => 'value2'],
+				[300 => 'value3', 400 => 'value4'],
+				false,
+				false,
+				[100 => 'value1', 200 => 'value2', 300 => 'value3', 400 => 'value4']
+			],
+			'Flat array with overlapping custom numeric keys' => [
+				[100 => 'value1', 200 => 'value2'],
+				[200 => 'value2_updated', 300 => 'value3'],
+				true,
+				false,
+				[100 => 'value1', 200 => 'value2_updated', 300 => 'value3']
+			],
+			'Flat array mixed numeric and string keys' => [
+				[100 => 'value1', 'key1' => 'value2'],
+				[200 => 'value3', 'key2' => 'value4'],
+				false,
+				false,
+				[100 => 'value1', 'key1' => 'value2', 200 => 'value3', 'key2' => 'value4']
+			],
         ];
     }
 

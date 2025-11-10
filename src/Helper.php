@@ -174,6 +174,9 @@ class Helper {
 	/**
 	 * Merges two arrays with options for deep merging and array concatenation.
 	 *
+	 * For flat arrays with sequential indexed keys (0, 1, 2...), values are concatenated.
+	 * For arrays with custom numeric keys, keys are preserved and values from array2 override array1.
+	 *
 	 * @param array $array1 The original array.
 	 * @param array $array2 The array to merge into the original array.
 	 * @param bool  $deep_merge Optional. Flag to control deep merging. Default is false.
@@ -183,7 +186,7 @@ class Helper {
 	public static function merge_arrays( array $array1, array $array2, bool $deep_merge = false, bool $concat_arrays = false ): array {
 		// Check if both arrays are flat
 		if ( self::is_flat_array( $array1 ) && self::is_flat_array( $array2 ) ) {
-			return array_merge( $array1, $array2 );
+			return self::merge_flat_arrays( $array1, $array2 );
 		} else {
 			foreach ( $array2 as $key => $value ) {
 				if ( ! isset( $array1[ $key ] ) || ( ! is_array( $value ) && ! is_array( $array1[ $key ] ) ) ) {
@@ -271,5 +274,27 @@ class Helper {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Merges two flat arrays while preserving custom numeric keys.
+	 *
+	 * If both arrays are indexed arrays (sequential 0, 1, 2...), concatenates them.
+	 * Otherwise, preserves all keys and values from array2 override array1.
+	 *
+	 * @param array $array1 The original flat array.
+	 * @param array $array2 The flat array to merge.
+	 * @return array The merged flat array.
+	 */
+	private static function merge_flat_arrays( array $array1, array $array2 ): array {
+		$both_indexed = self::is_indexed_array( $array1 ) && self::is_indexed_array( $array2 );
+
+		if ( $both_indexed ) {
+			// For sequential indexed arrays, concatenate values
+			return array_merge( $array1, $array2 );
+		}
+
+		// For arrays with custom numeric keys or associative keys, preserve all keys
+		return $array2 + $array1;
 	}
 }
