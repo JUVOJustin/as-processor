@@ -206,7 +206,7 @@ abstract class Sync implements Syncable {
 	public function handle_complete( int $action_id ): void {
 
 		$action = $this->action_belongs_to_sync( $action_id );
-		if ( ! $action || empty( $action->get_group() ) ) {
+		if ( ! $action ) {
 			return;
 		}
 
@@ -227,12 +227,6 @@ abstract class Sync implements Syncable {
 
 		// Fire per-action completion hook
 		do_action( $this->get_sync_name() . '/complete', $action, $action_id );
-
-		// Check if action of the same group is running or pending
-		$actions = $this->get_actions( status: array( ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING ), per_page: 1 );
-		if ( count( $actions ) === 0 ) {
-			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
-		}
 	}
 
 	/**
@@ -250,7 +244,7 @@ abstract class Sync implements Syncable {
 	 */
 	public function handle_start( int $action_id ): void {
 		$action = $this->action_belongs_to_sync( $action_id );
-		if ( ! $action || empty( $action->get_group() ) ) {
+		if ( ! $action ) {
 			return;
 		}
 
@@ -300,7 +294,7 @@ abstract class Sync implements Syncable {
 
 		// Check if action belongs to sync
 		$action = $this->action_belongs_to_sync( $action_id );
-		if ( ! $action || empty( $action->get_group() ) ) {
+		if ( ! $action ) {
 			return;
 		}
 
@@ -329,7 +323,7 @@ abstract class Sync implements Syncable {
 
 		// Check if action belongs to sync
 		$action = $this->action_belongs_to_sync( $action_id );
-		if ( ! $action || empty( $action->get_group() ) ) {
+		if ( ! $action ) {
 			return;
 		}
 
@@ -359,7 +353,7 @@ abstract class Sync implements Syncable {
 
 		// Check if action belongs to sync
 		$action = $this->action_belongs_to_sync( $action_id );
-		if ( ! $action || empty( $action->get_group() ) ) {
+		if ( ! $action ) {
 			return;
 		}
 
@@ -454,22 +448,6 @@ abstract class Sync implements Syncable {
 	 * @return void
 	 */
 	public function on_finish(): void {}
-
-	/**
-	 * Executes tasks after the synchronization process is complete.
-	 *
-	 * @deprecated Use on_finish() instead.
-	 *
-	 * This method is triggered upon the completion of a synchronization process.
-	 * It can perform cleanup tasks, post-sync operations, or finalize other processes tied to the sync group.
-	 *
-	 * Intention is to overwrite this method in child classes to ease implementation.
-	 *
-	 * @return void
-	 */
-	public function on_complete(): void {
-		$this->on_finish();
-	}
 
 	/**
 	 * Handles the behavior when an action fails.
