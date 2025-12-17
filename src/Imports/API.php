@@ -2,7 +2,9 @@
 
 namespace juvo\AS_Processor\Imports;
 
+use ActionScheduler_Store;
 use Exception;
+use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\Import;
 
 abstract class API extends Import
@@ -178,4 +180,57 @@ abstract class API extends Import
     }
 
     abstract protected function process_fetch(): mixed;
+
+	/**
+	 * Track the start time of the action that schedules the chunks.
+	 *
+	 * @param \ActionScheduler_Action $action The action being started.
+	 * @return void
+	 * @throws Exception When sync data update fails.
+	 */
+	public function track_scheduling_action( \ActionScheduler_Action $action ): void {
+
+		// Track the start of the first api fetching action only
+		if ( !$this->get_sync_data( 'spawning_action_started_at' ) && isset($action->get_args()['index']) ) {
+			$this->update_sync_data( 'spawning_action_started_at', time() );
+		}
+	}
+
+	/**
+	 * Tracks the end time of the action that schedules the chunks and triggers the finish action if applicable.
+	 *
+	 * @param \ActionScheduler_Action $action The action being completed.
+	 * @return void
+	 * @throws Exception When sync data update or retrieval fails.
+	 */
+	public function on_complete( \ActionScheduler_Action $action ): void {
+
+		if ( isset($action->get_args()['index']) ) {
+			$fetches = as_get_scheduled_actions([
+				'hook'        => $action->get_hook(),
+				'group'       => $action->get_group(),
+				'status'      => [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING],
+				'per_page'    => 1,
+			]);
+			
+			if (!empty($fetches)) {
+				return; // There are still pending or running fetch actions
+			}
+
+			$this->update_sync_data( 'spawning_action_ended_at', time() );
+		}
+		
+
+		// Check if action of the same group is running or pending
+		$completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
+
+		// Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
+		if (
+			$completed
+			&& $this->get_sync_data( 'spawning_action_started_at' )
+			&& $this->get_sync_data( 'spawning_action_ended_at' )
+		) {
+			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
+		}
+	}
 }
