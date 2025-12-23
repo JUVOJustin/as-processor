@@ -3,10 +3,11 @@
 namespace juvo\AS_Processor\Tests;
 
 use PHPUnit\Framework\TestCase;
+use juvo\AS_Processor\Sync_Data;
 
 class SyncDataTest extends TestCase
 {
-	use \juvo\AS_Processor\Sync_Data;
+	use Sync_Data;
 
 	private string $sync_data_name = 'test_sync';
 
