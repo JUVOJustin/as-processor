@@ -114,6 +114,23 @@ trait Sync_Data {
 	}
 
 	/**
+	 * Normalize a lock key to ensure it doesn't exceed MySQL's 64-character limit.
+	 *
+	 * @param string $lock_key The lock key to normalize.
+	 * @return string The normalized lock key (max 64 characters).
+	 */
+	protected function normalize_lock_key( string $lock_key ): string {
+		// If lock key is short enough, use it directly (better for debugging)
+		if ( strlen( $lock_key ) <= 64 ) {
+			return $lock_key;
+		}
+
+		// For long keys, use MD5 hash with prefix for identification
+		$hash = md5( $lock_key );
+		return 'asp_lock_' . $hash; // 41 chars total, well under limit
+	}
+
+	/**
 	 * Set a lock state for a specific key using MySQL GET_LOCK if available, or fallback to the current method.
 	 *
 	 * @param string $key The key for which the lock state is being set.
@@ -127,14 +144,15 @@ trait Sync_Data {
 		// Fallback to using transient-based locking if database locks are not supported
 		if ( ! $this->supports_db_locks() ) {
 			$this->set_option_lock( $lock_key, $state );
+			return;
 		}
 
 		// Use database-based locking for better reliability when available
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		global $wpdb;
 
-		// Use a unique lock name (prefix it if needed)
-		$db_lock_key = $wpdb->esc_like( $lock_key );
+		// Normalize lock key to prevent exceeding 64 chars
+		$db_lock_key = $this->normalize_lock_key( $lock_key );
 
 		if ( $state ) {
 			// Try to acquire a lock using MySQL GET_LOCK
