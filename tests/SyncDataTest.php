@@ -9,8 +9,6 @@ class SyncDataTest extends TestCase
 {
 	use Sync_Data;
 
-	private string $sync_data_name = 'test_sync';
-
 	/**
 	 * Test that short lock keys are returned unchanged
 	 */
