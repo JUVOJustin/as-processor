@@ -181,56 +181,96 @@ abstract class API extends Import
 
     abstract protected function process_fetch(): mixed;
 
-	/**
-	 * Track the start time of the action that schedules the chunks.
-	 *
-	 * @param \ActionScheduler_Action $action The action being started.
-	 * @return void
-	 * @throws Exception When sync data update fails.
-	 */
-	public function track_scheduling_action( \ActionScheduler_Action $action ): void {
+    /**
+     * Track the start time of the action that schedules the chunks.
+     *
+     * Note: The parent Import implementation identifies the "spawning" action
+     * by checking for an empty action group (empty( $action->get_group() )).
+     * For API imports we instead rely on the presence of an 'index' argument
+     * on the action, because API fetching/scheduling actions may use groups
+     * differently or share groups with other actions.
+     *
+     * With this logic, the first API fetching action that has an 'index'
+     * argument and for which no 'spawning_action_started_at' has been stored
+     * is treated as the spawning action. This divergence from the parent
+     * class is intentional.
+     *
+     * Context: API imports have fetching and chunk processing in two parallel
+     * running processes. They still belong to one sync though. The first fetch
+     * marks the start for a sync. For other imports the start is the first chunk,
+     * but that does not apply here.
+     *
+     * @param \ActionScheduler_Action $action The action being started.
+     * @return void
+     * @throws Exception When sync data update fails.
+     */
+    public function track_scheduling_action( \ActionScheduler_Action $action ): void {
 
-		// Track the start of the first api fetching action only
-		if ( !$this->get_sync_data( 'spawning_action_started_at' ) && isset($action->get_args()['index']) ) {
-			$this->update_sync_data( 'spawning_action_started_at', time() );
-		}
-	}
+        // Track the start of the first api fetching action only
+        if ( ! $this->get_sync_data( 'spawning_action_started_at' ) && isset( $action->get_args()['index'] ) ) {
+            $this->update_sync_data( 'spawning_action_started_at', time() );
+        }
+    }
 
-	/**
-	 * Tracks the end time of the action that schedules the chunks and triggers the finish action if applicable.
-	 *
-	 * @param \ActionScheduler_Action $action The action being completed.
-	 * @return void
-	 * @throws Exception When sync data update or retrieval fails.
-	 */
-	public function on_complete( \ActionScheduler_Action $action ): void {
+    /**
+     * Tracks the end time of the action that schedules the chunks and triggers the finish action if applicable.
+     *
+     * Note: The parent Import implementation identifies the "spawning" action completion
+     * by checking for an empty action group (empty( $action->get_group() )).
+     * For API imports we instead rely on the presence of an 'index' argument on the action.
+     *
+     * Additionally, we query for pending/running fetch actions to ensure all API fetching
+     * is complete before marking the spawning action as ended. This ensures the on_finish
+     * callback only runs when all fetches are complete, not just when all chunks are finished.
+     *
+     * KNOWN LIMITATION - Potential Race Condition:
+     * The query for pending/running actions (lines below) and the subsequent check are not atomic.
+     * Between checking for running actions and updating the sync data, another fetch action could
+     * complete. This could theoretically cause:
+     * 1. The 'spawning_action_ended_at' to be set prematurely if the last action completes
+     *    between the query and the update
+     * 2. Multiple actions to update 'spawning_action_ended_at' if several complete simultaneously
+     *
+     * However, this race condition has minimal practical impact because:
+     * - The timestamp will be set to approximately the correct time (within seconds)
+     * - Multiple updates will overwrite with similar timestamp values
+     * - The finish action trigger still requires all chunks to be completed, providing an
+     *   additional safety check
+     *
+     * A proper fix would require database-level locking or transactional guarantees, which
+     * would add significant complexity for marginal benefit in this use case.
+     *
+     * @param \ActionScheduler_Action $action The action being completed.
+     * @return void
+     * @throws Exception When sync data update or retrieval fails.
+     */
+    public function on_complete( \ActionScheduler_Action $action ): void {
 
-		if ( isset($action->get_args()['index']) ) {
-			$fetches = as_get_scheduled_actions([
-				'hook'        => $action->get_hook(),
-				'group'       => $action->get_group(),
-				'status'      => [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING],
-				'per_page'    => 1,
-			]);
-			
-			if (!empty($fetches)) {
-				return; // There are still pending or running fetch actions
-			}
+        if ( isset( $action->get_args()['index'] ) ) {
+            $fetches = as_get_scheduled_actions([
+                'hook'        => $action->get_hook(),
+                'group'       => $action->get_group(),
+                'status'      => [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING],
+                'per_page'    => 1,
+            ]);
 
-			$this->update_sync_data( 'spawning_action_ended_at', time() );
-		}
-		
+            if ( ! empty( $fetches ) ) {
+                return; // There are still pending or running fetch actions
+            }
 
-		// Check if action of the same group is running or pending
-		$completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
+            $this->update_sync_data( 'spawning_action_ended_at', time() );
+        }
 
-		// Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
-		if (
-			$completed
-			&& $this->get_sync_data( 'spawning_action_started_at' )
-			&& $this->get_sync_data( 'spawning_action_ended_at' )
-		) {
-			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
-		}
-	}
+        // Check if action of the same group is running or pending
+        $completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
+
+        // Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
+        if (
+            $completed
+            && $this->get_sync_data( 'spawning_action_started_at' )
+            && $this->get_sync_data( 'spawning_action_ended_at' )
+        ) {
+            do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
+        }
+    }
 }
