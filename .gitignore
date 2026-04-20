@@ -1,1 +1,31 @@
-vendor
+# Composer
+/vendor/
+
+# Node / wp-env
+/node_modules/
+npm-debug.log
+yarn-error.log
+
+# PHPUnit
+/.phpunit.cache/
+/.phpunit.result.cache
+/tests/coverage-html/
+/tests/coverage-clover.xml
+/phpcs-report.xml
+
+# Demo plugin installs (generated when running E2E tests locally)
+/tests/e2e/demo-plugin/vendor/
+/tests/e2e/demo-plugin/tests/vendor/
+/tests/e2e/demo-plugin/composer.lock
+/tests/e2e/demo-plugin/tests/composer.lock
+/tests/e2e/demo-plugin/tests/.phpunit.result.cache
+/tests/e2e/demo-plugin/data/products.xlsx
+
+# IDE / editor
+/.idea/
+/.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

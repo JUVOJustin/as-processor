@@ -27,6 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Load Cache
         uses: actions/cache@v4
         with:
@@ -35,6 +40,9 @@ jobs:
           key: composer--${{ hashFiles('composer.lock') }}
           fail-on-cache-miss: true
         id: cache
+
+      - name: Install Node Dependencies
+        run: npm install --no-fund --no-audit
 
       - name: PHPSTAN
         run: composer run phpstan:ci
@@ -49,4 +57,52 @@ jobs:
         run: cs2pr ./phpcs-report.xml --graceful-warnings
 
       - name: PHP Unit Test
-        run: composer run test:unit
+        run: |
+          npm run env:start
+          npm run test:unit
+        timeout-minutes: 15
+
+      - name: Stop wp-env
+        if: ${{ always() }}
+        run: npm run env:stop
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Load Composer Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            vendor
+          key: composer--${{ hashFiles('composer.lock') }}
+          fail-on-cache-miss: true
+
+      - name: Install Node Dependencies
+        run: npm install --no-fund --no-audit
+
+      - name: Start wp-env
+        run: npm run env:start
+        timeout-minutes: 10
+
+      - name: Run E2E Test Suite
+        run: npm run test:e2e
+        timeout-minutes: 15
+
+      - name: Stop wp-env
+        if: ${{ always() }}
+        run: npm run env:stop

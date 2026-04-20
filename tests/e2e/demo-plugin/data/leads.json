@@ -1,0 +1,117 @@
+{
+  "leads": [
+    {
+      "id": 1,
+      "first_name": "John",
+      "last_name": "Smith",
+      "email": "john.smith@example.com",
+      "phone": "+1-555-0101",
+      "company": "TechCorp Inc",
+      "score": 85
+    },
+    {
+      "id": 2,
+      "first_name": "Sarah",
+      "last_name": "Johnson",
+      "email": "sarah.j@example.com",
+      "phone": "+1-555-0102",
+      "company": "Design Studio LLC",
+      "score": 92
+    },
+    {
+      "id": 3,
+      "first_name": "Michael",
+      "last_name": "Brown",
+      "email": "mbrown@example.com",
+      "phone": "+1-555-0103",
+      "company": "Consulting Group",
+      "score": 78
+    },
+    {
+      "id": 4,
+      "first_name": "Emily",
+      "last_name": "Davis",
+      "email": "emily.davis@example.com",
+      "phone": "+1-555-0104",
+      "company": "Marketing Pro",
+      "score": 88
+    },
+    {
+      "id": 5,
+      "first_name": "David",
+      "last_name": "Wilson",
+      "email": "david.w@example.com",
+      "phone": "+1-555-0105",
+      "company": "StartupXYZ",
+      "score": 95
+    },
+    {
+      "id": 6,
+      "first_name": "Lisa",
+      "last_name": "Anderson",
+      "email": "lisa.a@example.com",
+      "phone": "+1-555-0106",
+      "company": "Finance Hub",
+      "score": 72
+    },
+    {
+      "id": 7,
+      "first_name": "Robert",
+      "last_name": "Taylor",
+      "email": "robert.t@example.com",
+      "phone": "+1-555-0107",
+      "company": "Cloud Solutions",
+      "score": 90
+    },
+    {
+      "id": 8,
+      "first_name": "Jennifer",
+      "last_name": "Martinez",
+      "email": "jenn.m@example.com",
+      "phone": "+1-555-0108",
+      "company": "Creative Agency",
+      "score": 82
+    },
+    {
+      "id": 9,
+      "first_name": "James",
+      "last_name": "Garcia",
+      "email": "james.g@example.com",
+      "phone": "+1-555-0109",
+      "company": "Data Systems",
+      "score": 76
+    },
+    {
+      "id": 10,
+      "first_name": "Maria",
+      "last_name": "Rodriguez",
+      "email": "maria.r@example.com",
+      "phone": "+1-555-0110",
+      "company": "Web Services Inc",
+      "score": 89
+    },
+    {
+      "id": 11,
+      "first_name": "William",
+      "last_name": "Lee",
+      "email": "william.lee@example.com",
+      "phone": "+1-555-0111",
+      "company": "Software House",
+      "score": 93
+    },
+    {
+      "id": 12,
+      "first_name": "Patricia",
+      "last_name": "White",
+      "email": "pat.white@example.com",
+      "phone": "+1-555-0112",
+      "company": "Retail Chain Co",
+      "score": 67
+    }
+  ],
+  "metadata": {
+    "total": 12,
+    "imported_at": "2024-01-15T10:30:00Z",
+    "source": "CRM Export"
+  }
+}

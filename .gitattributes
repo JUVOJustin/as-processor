@@ -1,0 +1,13 @@
+# Files excluded from Composer/GitHub archive downloads.
+# These are only relevant to developing and testing the library — consumers
+# who install via `composer require juvo/as-processor` should never see them.
+
+/tests                  export-ignore
+/.github                export-ignore
+/.ddev                  export-ignore
+/.claude                export-ignore
+/.git*                  export-ignore
+/package*.json          export-ignore
+/*.xml                  export-ignore
+/*.neon                 export-ignore
+/AGENTS.md              export-ignore

@@ -5,10 +5,7 @@
     "license": "GPL-3.0-or-later",
     "require": {
         "php": ">=8.1.0",
-        "phpseclib/phpseclib": "^3.0.37",
         "woocommerce/action-scheduler": "^3.7",
-        "sabre/dav": "^4.6",
-        "cardinalby/content-disposition": "^1.1",
         "league/csv": "^9.0",
         "phpoffice/phpspreadsheet": "^2.1",
         "halaxa/json-machine": "^1.2"
@@ -25,7 +22,11 @@
     ],
     "autoload": {
         "psr-4": {
-            "juvo\\AS_Processor\\": "src/",
+            "juvo\\AS_Processor\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
             "juvo\\AS_Processor\\Tests\\": "tests/"
         }
     },
@@ -33,7 +34,7 @@
         "phpstan/phpstan": "^1.10.6",
         "szepeviktor/phpstan-wordpress": "^v1.1.7",
         "phpstan/extension-installer": "^1.1",
-        "phpunit/phpunit": "10",
+        "phpunit/phpunit": "^9.6",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "config": {
@@ -44,6 +45,19 @@
             "phpstan/extension-installer": true,
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
+    },
+    "archive": {
+        "exclude": [
+            "/tests",
+            "/.github",
+            "/.ddev",
+            "/.claude",
+            "/.git*",
+            "/package*.json",
+            "/*.xml",
+            "/*.neon",
+            "/AGENTS.md"
+        ]
     },
     "scripts": {
         "test:unit": "@php ./vendor/bin/phpunit tests",
