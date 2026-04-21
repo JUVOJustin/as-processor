@@ -9,7 +9,7 @@ namespace AS_Processor_Demo;
 
 class Sequential_Product_CSV_Import extends Product_CSV_Import {
 
-	public const SYNC_NAME = 'asp_demo_sequence_product_csv_import';
+	public const SYNC_NAME         = 'asp_demo_sequence_product_csv_import';
 	public const PRODUCT_COUNT_KEY = 'sequence_csv_product_count';
 
 	public function get_sync_name(): string {

@@ -124,15 +124,15 @@ class Action_Tracking_Regression_Test extends E2E_Test_Case {
 		string $handler,
 		ProcessStatus $expected_status
 	): void {
-		$sync        = $this->create_sync_double( 'asp_test_terminal_handlers_' . $hook_suffix );
-		$group       = $sync->get_sync_group_name();
-		$chunk       = new Chunk();
-		$hook_calls  = 0;
+		$sync       = $this->create_sync_double( 'asp_test_terminal_handlers_' . $hook_suffix );
+		$group      = $sync->get_sync_group_name();
+		$chunk      = new Chunk();
+		$hook_calls = 0;
 
 		$chunk->set_group( $group );
 		$chunk->set_status( ProcessStatus::SCHEDULED );
 		$chunk->set_data( array( 'row' => $hook_suffix ) );
-		$chunk_id = $chunk->save();
+		$chunk_id  = $chunk->save();
 		$action_id = as_enqueue_async_action( $sync->get_sync_name() . '/process_chunk', array( 'chunk_id' => $chunk_id ), $group );
 
 		$chunk->set_action_id( $action_id );

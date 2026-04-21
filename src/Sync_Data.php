@@ -49,7 +49,8 @@ trait Sync_Data {
 	 */
 	public function get_sync_data_name(): string {
 		// Set sync data key to the group name by default. Sequential Sync does not have a group name
-		if ( empty( $this->sync_data_name ) && method_exists( $this, 'get_sync_group_name' ) ) {
+		// @phpstan-ignore-next-line The trait is also used in tests without get_sync_group_name().
+		if ( empty( $this->sync_data_name ) && is_callable( array( $this, 'get_sync_group_name' ) ) ) {
 			$this->sync_data_name = $this->get_sync_group_name();
 			return $this->sync_data_name;
 		}

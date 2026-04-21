@@ -9,9 +9,9 @@ namespace AS_Processor_Demo;
 
 class Sequential_Lead_JSON_Import extends Lead_JSON_Import {
 
-	public const SYNC_NAME = 'asp_demo_sequence_lead_json_import';
+	public const SYNC_NAME                  = 'asp_demo_sequence_lead_json_import';
 	public const OBSERVED_PRODUCT_COUNT_KEY = 'sequence_json_observed_csv_product_count';
-	public const OBSERVED_AT_START_KEY = 'sequence_json_observed_csv_product_count_at_start';
+	public const OBSERVED_AT_START_KEY      = 'sequence_json_observed_csv_product_count_at_start';
 
 	public function get_sync_name(): string {
 		return self::SYNC_NAME;

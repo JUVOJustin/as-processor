@@ -20,8 +20,8 @@ use juvo\AS_Processor\DB\Data_DB;
 class Sequential_Sync_Test extends E2E_Test_Case {
 
 	public function test_sequential_sync_runs_jobs_in_order_through_real_queue(): void {
-		$csv_finish_calls  = 0;
-		$json_start_calls  = 0;
+		$csv_finish_calls = 0;
+		$json_start_calls = 0;
 
 		add_action(
 			Sequential_Product_CSV_Import::SYNC_NAME . '/finish',

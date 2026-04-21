@@ -28,11 +28,11 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  *
  * The Sync class provides several lifecycle hooks that fire at different stages:
  *
-	 * ### Per-Action Hooks
-	 * - `{sync_name}/complete` - Fires for each completed action in the sync group
-	 *   Parameters: ActionScheduler_Action $action, int $action_id
-	 * - `{sync_name}/start` - Fires for each started action in the sync group
-	 *   Parameters: ActionScheduler_Action $action, int $action_id
+ * ### Per-Action Hooks
+ * - `{sync_name}/complete` - Fires for each completed action in the sync group
+ *   Parameters: ActionScheduler_Action $action, int $action_id
+ * - `{sync_name}/start` - Fires for each started action in the sync group
+ *   Parameters: ActionScheduler_Action $action, int $action_id
  *
  * ### Group-Level Hooks
  * - `{sync_name}/finish` - Fires once when all actions in the group are complete
