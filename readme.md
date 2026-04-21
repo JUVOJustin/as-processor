@@ -77,3 +77,63 @@ npm run env:stop
 
 - The demo plugin consumes the split packages directly so the application suite verifies the new package boundaries.
 - Consumers install `juvo/as-processor` first, then add only the adapter packages they need.
+
+## Releases
+
+This repository uses `symplify/monorepo-builder` for monorepo package management and `danharrin/monorepo-split-github-action` to publish the adapter packages to split repositories.
+
+Available monorepo management commands:
+
+```bash
+composer run monorepo:validate
+composer run monorepo:localize
+composer run monorepo:propagate
+composer run monorepo:package-alias
+```
+
+Recommended public release model:
+
+- publish `juvo/as-processor` from this repository
+- publish adapter packages from split repositories
+- register the source repo and each adapter split repo on Packagist
+
+Release tags:
+
+```text
+v1.2.0          # core package from this repository
+csv-v1.2.0      # CSV adapter split repo
+excel-v1.2.0    # Excel adapter split repo
+json-v1.2.0     # JSON adapter split repo
+api-v1.2.0      # API adapter split repo
+```
+
+The repository includes two release workflows:
+
+- `.github/workflows/split-packages.yml`: syncs adapter split repositories on `main` and publishes adapter tags
+- `.github/workflows/release-core.yml`: notifies Packagist when a core `v*` tag is pushed
+
+Required GitHub secret:
+
+- `SPLIT_REPO_TOKEN`: token with push access to the adapter split repositories
+
+Required GitHub repository variables:
+
+- `SPLIT_REPO_OWNER`
+- `SPLIT_REPO_CSV`
+- `SPLIT_REPO_EXCEL`
+- `SPLIT_REPO_JSON`
+- `SPLIT_REPO_API`
+
+Optional Packagist update variables:
+
+- `PACKAGIST_UPDATE_URL_CORE`
+- `PACKAGIST_UPDATE_URL_CSV`
+- `PACKAGIST_UPDATE_URL_EXCEL`
+- `PACKAGIST_UPDATE_URL_JSON`
+- `PACKAGIST_UPDATE_URL_API`
+
+The split workflow assumes the root package is released from this repository, while only the adapter packages are mirrored to split repositories.
+
+Current caveat:
+
+- internal package constraints remain `@dev` on the main branch for monorepo development, so the release process still needs a follow-up step if you want adapter split repos to publish stable root-package constraints automatically

@@ -1,0 +1,137 @@
+name: Split Packages
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'csv-v*'
+      - 'excel-v*'
+      - 'json-v*'
+      - 'api-v*'
+
+jobs:
+  split:
+    if: ${{ secrets.SPLIT_REPO_TOKEN != '' && vars.SPLIT_REPO_OWNER != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: csv
+            package_directory: packages/csv
+            tag_prefix: csv
+            repo_var: SPLIT_REPO_CSV
+            packagist_var: PACKAGIST_UPDATE_URL_CSV
+          - package: excel
+            package_directory: packages/excel
+            tag_prefix: excel
+            repo_var: SPLIT_REPO_EXCEL
+            packagist_var: PACKAGIST_UPDATE_URL_EXCEL
+          - package: json
+            package_directory: packages/json
+            tag_prefix: json
+            repo_var: SPLIT_REPO_JSON
+            packagist_var: PACKAGIST_UPDATE_URL_JSON
+          - package: api
+            package_directory: packages/api
+            tag_prefix: api
+            repo_var: SPLIT_REPO_API
+            packagist_var: PACKAGIST_UPDATE_URL_API
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve target repo
+        id: target
+        env:
+          SPLIT_REPO_OWNER: ${{ vars.SPLIT_REPO_OWNER }}
+          SPLIT_REPO_CSV: ${{ vars.SPLIT_REPO_CSV }}
+          SPLIT_REPO_EXCEL: ${{ vars.SPLIT_REPO_EXCEL }}
+          SPLIT_REPO_JSON: ${{ vars.SPLIT_REPO_JSON }}
+          SPLIT_REPO_API: ${{ vars.SPLIT_REPO_API }}
+          PACKAGIST_UPDATE_URL_CSV: ${{ vars.PACKAGIST_UPDATE_URL_CSV }}
+          PACKAGIST_UPDATE_URL_EXCEL: ${{ vars.PACKAGIST_UPDATE_URL_EXCEL }}
+          PACKAGIST_UPDATE_URL_JSON: ${{ vars.PACKAGIST_UPDATE_URL_JSON }}
+          PACKAGIST_UPDATE_URL_API: ${{ vars.PACKAGIST_UPDATE_URL_API }}
+        run: |
+          case "${{ matrix.repo_var }}" in
+            SPLIT_REPO_CSV)
+              repository_name="${SPLIT_REPO_CSV}"
+              packagist_url="${PACKAGIST_UPDATE_URL_CSV}"
+              ;;
+            SPLIT_REPO_EXCEL)
+              repository_name="${SPLIT_REPO_EXCEL}"
+              packagist_url="${PACKAGIST_UPDATE_URL_EXCEL}"
+              ;;
+            SPLIT_REPO_JSON)
+              repository_name="${SPLIT_REPO_JSON}"
+              packagist_url="${PACKAGIST_UPDATE_URL_JSON}"
+              ;;
+            SPLIT_REPO_API)
+              repository_name="${SPLIT_REPO_API}"
+              packagist_url="${PACKAGIST_UPDATE_URL_API}"
+              ;;
+          esac
+
+          if [ -z "$repository_name" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "repository_name=$repository_name" >> "$GITHUB_OUTPUT"
+          echo "repository_owner=${SPLIT_REPO_OWNER}" >> "$GITHUB_OUTPUT"
+          echo "packagist_url=$packagist_url" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve release tag
+        id: release
+        if: steps.target.outputs.enabled == 'true'
+        run: |
+          if [[ "${GITHUB_REF}" != refs/tags/* ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          ref_name="${GITHUB_REF_NAME}"
+          prefix="${{ matrix.tag_prefix }}-v"
+
+          if [[ "$ref_name" != ${prefix}* ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "tag=v${ref_name#${prefix}}" >> "$GITHUB_OUTPUT"
+
+      - name: Split branch
+        if: steps.target.outputs.enabled == 'true' && !startsWith(github.ref, 'refs/tags/')
+        uses: danharrin/monorepo-split-github-action@v2.4.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.SPLIT_REPO_TOKEN }}
+        with:
+          package_directory: ${{ matrix.package_directory }}
+          repository_organization: ${{ steps.target.outputs.repository_owner }}
+          repository_name: ${{ steps.target.outputs.repository_name }}
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Split tag
+        if: steps.target.outputs.enabled == 'true' && steps.release.outputs.enabled == 'true'
+        uses: danharrin/monorepo-split-github-action@v2.4.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.SPLIT_REPO_TOKEN }}
+        with:
+          tag: ${{ steps.release.outputs.tag }}
+          package_directory: ${{ matrix.package_directory }}
+          repository_organization: ${{ steps.target.outputs.repository_owner }}
+          repository_name: ${{ steps.target.outputs.repository_name }}
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Notify Packagist
+        if: steps.target.outputs.enabled == 'true' && steps.release.outputs.enabled == 'true' && steps.target.outputs.packagist_url != ''
+        run: curl -XPOST --fail --silent --show-error "${{ steps.target.outputs.packagist_url }}"

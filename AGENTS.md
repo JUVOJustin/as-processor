@@ -145,6 +145,14 @@ The shared helpers live in `tests/e2e/demo-plugin/tests/support/`:
 2. **`test`** — PHPStan and PHPCS.
 3. **`wp-env-tests`** — starts wp-env once and runs both the unit and E2E suites inside `tests-cli` after the static checks pass.
 
+Independent package releases use Monorepo Builder for monorepo management and package-prefixed adapter tags with the split workflows under `.github/workflows/`:
+
+- `v*`
+- `csv-v*`
+- `excel-v*`
+- `json-v*`
+- `api-v*`
+
 ## Code changes
 
 Always run both suites before committing:

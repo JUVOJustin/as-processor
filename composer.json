@@ -67,6 +67,7 @@
         "szepeviktor/phpstan-wordpress": "^v1.1.7",
         "phpstan/extension-installer": "^1.1",
         "phpunit/phpunit": "^9.6",
+        "symplify/monorepo-builder": "^11.2",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "config": {
@@ -99,6 +100,11 @@
         ]
     },
     "scripts": {
+        "monorepo-builder": "@php ./vendor/bin/monorepo-builder",
+        "monorepo:validate": "@monorepo-builder validate",
+        "monorepo:localize": "@monorepo-builder localize-composer-paths",
+        "monorepo:propagate": "@monorepo-builder propagate",
+        "monorepo:package-alias": "@monorepo-builder package-alias",
         "test:unit": "@php ./vendor/bin/phpunit -c phpunit.xml",
         "phpstan": "@php ./vendor/bin/phpstan analyse",
         "phpstan:ci": "@php ./vendor/bin/phpstan analyse --error-format=checkstyle | cs2pr",
