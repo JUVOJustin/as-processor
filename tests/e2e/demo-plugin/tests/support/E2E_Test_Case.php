@@ -13,10 +13,13 @@
 namespace AS_Processor_Demo\Tests\Support;
 
 use ActionScheduler_Store;
+use AS_Processor_Demo\Combined_Sequential_Import;
 use AS_Processor_Demo\Lead_JSON_Import;
 use AS_Processor_Demo\Product_API_Import;
 use AS_Processor_Demo\Product_CSV_Import;
 use AS_Processor_Demo\Product_Excel_Import;
+use AS_Processor_Demo\Sequential_Lead_JSON_Import;
+use AS_Processor_Demo\Sequential_Product_CSV_Import;
 use AS_Processor_Demo\Support\Demo_Fixture_Manager;
 use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\DB\Data_DB;
@@ -221,10 +224,13 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	 */
 	private function sync_hooks(): array {
 		return array(
+			Combined_Sequential_Import::SYNC_NAME,
 			Product_CSV_Import::SYNC_NAME,
 			Lead_JSON_Import::SYNC_NAME,
 			Product_Excel_Import::SYNC_NAME,
 			Product_API_Import::SYNC_NAME,
+			Sequential_Product_CSV_Import::SYNC_NAME,
+			Sequential_Lead_JSON_Import::SYNC_NAME,
 		);
 	}
 }

@@ -101,17 +101,26 @@ abstract class Import extends Sync {
 		if ( empty( $action->get_group() ) ) {
 			$this->update_sync_data( 'spawning_action_ended_at', time() );
 		}
+	}
 
-		// Check if action of the same group is running or pending
+	/**
+	 * Imports finish only after all tracked chunks are complete and the spawning action has both started and ended.
+	 *
+	 * @param \ActionScheduler_Action $action The action that just completed.
+	 * @return bool
+	 * @throws Exception When sync data retrieval fails.
+	 */
+	protected function should_trigger_finish( \ActionScheduler_Action $action ): bool {
+		if ( ! parent::should_trigger_finish( $action ) ) {
+			return false;
+		}
+
 		$completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
 
-		// Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
-		if (
+		return (
 			$completed
 			&& $this->get_sync_data( 'spawning_action_started_at' )
 			&& $this->get_sync_data( 'spawning_action_ended_at' )
-		) {
-			do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
-		}
+		);
 	}
 }

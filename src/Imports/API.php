@@ -260,17 +260,26 @@ abstract class API extends Import
 
             $this->update_sync_data( 'spawning_action_ended_at', time() );
         }
+    }
 
-        // Check if action of the same group is running or pending
+    /**
+     * API imports finish only after the fetch chain ended and all tracked chunks completed.
+     *
+     * @param \ActionScheduler_Action $action The action that just completed.
+     * @return bool
+     * @throws Exception When sync data retrieval fails.
+     */
+    protected function should_trigger_finish( \ActionScheduler_Action $action ): bool {
+        if ( ! parent::should_trigger_finish( $action ) ) {
+            return false;
+        }
+
         $completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
 
-        // Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
-        if (
+        return (
             $completed
             && $this->get_sync_data( 'spawning_action_started_at' )
             && $this->get_sync_data( 'spawning_action_ended_at' )
-        ) {
-            do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
-        }
+        );
     }
 }

@@ -113,8 +113,8 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 			// Overwrite sync data name to share data between jobs
 			$job->set_sync_data_name( $this->get_sync_name() );
 
-			// Registering the "next" function to the "complete" hook is essential to run the next job in the sequence
-			add_action( $job->get_sync_name() . '/complete', array( $this, 'next' ) );
+			// Advance the sequence only once the current job fully finished.
+			add_action( $job->get_sync_name() . '/finish', array( $this, 'next' ) );
 		}
 	}
 
@@ -135,7 +135,7 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 
 			// Restore data from run
 			$this->queue        = $queue;
-			$this->current_sync = $current_sync ?? null;
+			$this->current_sync = $current_sync instanceof Sync ? $current_sync : null;
 		}
 	}
 
@@ -173,8 +173,9 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 		$this->update_sync_data( 'queue', $this->queue );
 		$this->update_sync_data( 'current_sync', $this->current_sync );
 
-		// Execute Sync
-		do_action( $this->current_sync->get_sync_name() );
+		// Execute the next sync through Action Scheduler so child lifecycle hooks
+		// observe a real root action and can trigger their finish callbacks.
+		as_enqueue_async_action( $this->current_sync->get_sync_name() );
 	}
 
 	/**
