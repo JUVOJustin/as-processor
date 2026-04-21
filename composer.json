@@ -59,10 +59,10 @@
         }
     },
     "require-dev": {
-        "juvo/as-processor-csv": "^1.0@dev",
-        "juvo/as-processor-excel": "^1.0@dev",
-        "juvo/as-processor-json": "^1.0@dev",
-        "juvo/as-processor-api": "^1.0@dev",
+        "juvo/as-processor-csv": "@dev",
+        "juvo/as-processor-excel": "@dev",
+        "juvo/as-processor-json": "@dev",
+        "juvo/as-processor-api": "@dev",
         "phpstan/phpstan": "^1.10.6",
         "szepeviktor/phpstan-wordpress": "^v1.1.7",
         "phpstan/extension-installer": "^1.1",

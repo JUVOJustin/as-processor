@@ -3,10 +3,9 @@
     "description": "CSV import adapter for AS Processor.",
     "type": "library",
     "license": "GPL-3.0-or-later",
-    "version": "1.0.x-dev",
     "require": {
         "php": ">=8.1.0",
-        "juvo/as-processor": "^1.0@dev",
+        "juvo/as-processor": "@dev",
         "league/csv": "^9.0"
     },
     "autoload": {

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "52bd26c7ae15f5c764cbcee4e6e7d589",
+    "content-hash": "a51ee6cc350bcd3d11c16d57f329a9d8",
     "packages": [
         {
             "name": "woocommerce/action-scheduler",
@@ -360,14 +360,14 @@
         },
         {
             "name": "juvo/as-processor-api",
-            "version": "1.0.x-dev",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/api",
-                "reference": "0f8dbb83f70772a5e65683f17e4af922192c91c3"
+                "reference": "c1a05a88cb5fc298d7ee28b7fcb5b789da629be6"
             },
             "require": {
-                "juvo/as-processor": "^1.0@dev",
+                "juvo/as-processor": "@dev",
                 "php": ">=8.1.0"
             },
             "type": "library",
@@ -387,14 +387,14 @@
         },
         {
             "name": "juvo/as-processor-csv",
-            "version": "1.0.x-dev",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/csv",
-                "reference": "2954685dfbbc3b65bddb460bb88e82426cb0a670"
+                "reference": "8f2e0987fdfdb1f4adda2b65ac9199ea1ea1d519"
             },
             "require": {
-                "juvo/as-processor": "^1.0@dev",
+                "juvo/as-processor": "@dev",
                 "league/csv": "^9.0",
                 "php": ">=8.1.0"
             },
@@ -415,14 +415,14 @@
         },
         {
             "name": "juvo/as-processor-excel",
-            "version": "1.0.x-dev",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/excel",
-                "reference": "e068ecd1799ddbec770425cf87fa47f997fafe33"
+                "reference": "46a096c5f0b8eaa829858f62990fdd24950dae1a"
             },
             "require": {
-                "juvo/as-processor": "^1.0@dev",
+                "juvo/as-processor": "@dev",
                 "php": ">=8.1.0",
                 "phpoffice/phpspreadsheet": "^2.1"
             },
@@ -443,15 +443,15 @@
         },
         {
             "name": "juvo/as-processor-json",
-            "version": "1.0.x-dev",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/json",
-                "reference": "e3f864846658cd4868e57a0e7deba63636b9c0cd"
+                "reference": "9c13821b1f73e32886575d08e37138d7dd29c58e"
             },
             "require": {
                 "halaxa/json-machine": "^1.2",
-                "juvo/as-processor": "^1.0@dev",
+                "juvo/as-processor": "@dev",
                 "php": ">=8.1.0"
             },
             "type": "library",

@@ -16,10 +16,7 @@
             "type": "path",
             "url": "../as-processor-library-src",
             "options": {
-                "symlink": false,
-                "versions": {
-                    "juvo/as-processor": "1.0.x-dev"
-                }
+                "symlink": false
             }
         },
         "as-processor-csv": {
