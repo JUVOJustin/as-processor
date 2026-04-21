@@ -100,6 +100,7 @@ abstract class Excel extends Import
 
             $i = 0;
             $columnIterator = $row->getCellIterator();
+            $columnIterator->setIterateOnlyExistingCells( false );
             $rowData = [];
             foreach ($columnIterator as $cell) {
 
