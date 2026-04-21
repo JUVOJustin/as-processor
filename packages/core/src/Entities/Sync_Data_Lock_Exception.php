@@ -4,7 +4,7 @@
  * cannot be acquired. This exception is typically used in scenarios where
  * concurrent processes attempt to access a shared resource that is already locked.
  *
- * @package juvo/as_processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor\Entities;

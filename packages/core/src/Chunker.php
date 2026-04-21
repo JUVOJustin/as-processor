@@ -5,7 +5,7 @@
  * Provides functionality for processing data in chunks using WordPress Action Scheduler.
  * Handles scheduling, processing, and cleanup of chunked data operations.
  *
- * @package juvo\AS_Processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor;

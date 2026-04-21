@@ -1,4 +1,9 @@
 <?php
+/**
+ * CSV import adapter.
+ *
+ * @package juvo/as-processor-csv
+ */
 
 namespace juvo\AS_Processor\Imports;
 

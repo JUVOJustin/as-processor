@@ -2,7 +2,7 @@
 /**
  * Trait Sync_Data
  *
- * @package juvo/as_processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor;

@@ -1,4 +1,9 @@
 <?php
+/**
+ * Paginated API import adapter.
+ *
+ * @package juvo/as-processor-api
+ */
 
 namespace juvo\AS_Processor\Imports;
 

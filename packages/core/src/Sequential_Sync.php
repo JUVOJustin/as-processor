@@ -2,7 +2,7 @@
 /**
  * Allows adding syncs in a sequence to ensure execution in the proper order
  *
- * @package juvo/as-processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor;

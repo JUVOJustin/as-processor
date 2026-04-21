@@ -6,7 +6,7 @@
  * Provides methods for retrieving the name of the sync operation and for scheduling
  * synchronization tasks.
  *
- * @package juvo/as-processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor;

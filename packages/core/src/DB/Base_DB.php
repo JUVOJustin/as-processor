@@ -2,7 +2,7 @@
 /**
  * Base layer for custom DB tables.
  *
- * @package juvo/as-processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor\DB;

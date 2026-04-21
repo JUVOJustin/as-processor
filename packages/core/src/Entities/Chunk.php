@@ -2,7 +2,7 @@
 /**
  * Chunk Entity
  *
- * @package juvo\AS_Processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor\Entities;

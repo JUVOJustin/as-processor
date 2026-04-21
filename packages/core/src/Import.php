@@ -6,7 +6,7 @@
  * and process each chunk independently. Subclasses are required to implement specific logic
  * for splitting the data into chunks.
  *
- * @package juvo/as-processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor;

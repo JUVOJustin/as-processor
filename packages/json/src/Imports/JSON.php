@@ -2,7 +2,7 @@
 /**
  * Handles JSON Imports.
  *
- * @package juvo\AS_Processor
+ * @package juvo/as-processor-json
  */
 namespace juvo\AS_Processor\Imports;
 

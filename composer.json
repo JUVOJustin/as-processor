@@ -1,14 +1,53 @@
 {
     "name": "juvo/as-processor",
-    "description": "Process huge datasets for import or sync with ease.",
-    "keywords"    : [ "wordpress", "action scheduler", "scheduler", "data" ],
+    "description": "Install-all bundle for the AS Processor core and import adapters.",
+    "keywords": ["wordpress", "action scheduler", "scheduler", "data"],
     "license": "GPL-3.0-or-later",
+    "type": "library",
     "require": {
         "php": ">=8.1.0",
-        "woocommerce/action-scheduler": "^3.7",
-        "league/csv": "^9.0",
-        "phpoffice/phpspreadsheet": "^2.1",
-        "halaxa/json-machine": "^1.2"
+        "juvo/as-processor-core": "^1.0@dev",
+        "juvo/as-processor-csv": "^1.0@dev",
+        "juvo/as-processor-excel": "^1.0@dev",
+        "juvo/as-processor-json": "^1.0@dev",
+        "juvo/as-processor-api": "^1.0@dev"
+    },
+    "repositories": {
+        "as-processor-core": {
+            "type": "path",
+            "url": "packages/core",
+            "options": {
+                "symlink": true
+            }
+        },
+        "as-processor-csv": {
+            "type": "path",
+            "url": "packages/csv",
+            "options": {
+                "symlink": true
+            }
+        },
+        "as-processor-excel": {
+            "type": "path",
+            "url": "packages/excel",
+            "options": {
+                "symlink": true
+            }
+        },
+        "as-processor-json": {
+            "type": "path",
+            "url": "packages/json",
+            "options": {
+                "symlink": true
+            }
+        },
+        "as-processor-api": {
+            "type": "path",
+            "url": "packages/api",
+            "options": {
+                "symlink": true
+            }
+        }
     },
     "support"     : {
         "issues" : "https://github.com/JUVOJustin/wp-secure-actions/issues"
@@ -20,11 +59,6 @@
             "homepage": "https://justin-vogt.com"
         }
     ],
-    "autoload": {
-        "psr-4": {
-            "juvo\\AS_Processor\\": "src/"
-        }
-    },
     "autoload-dev": {
         "psr-4": {
             "juvo\\AS_Processor\\Tests\\": "tests/"
@@ -46,8 +80,11 @@
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
     },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "archive": {
         "exclude": [
+            "/packages",
             "/tests",
             "/.github",
             "/.ddev",

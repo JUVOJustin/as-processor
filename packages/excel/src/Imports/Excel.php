@@ -13,6 +13,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\CellIterator;
  *
  * @since   2024-07-15
  * @author  Laura Herzog <laura.herzog@citation.media>
+ * @package juvo/as-processor-excel
  */
 abstract class Excel extends Import
 {

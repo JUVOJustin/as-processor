@@ -3,7 +3,7 @@
  * A utility class that provides various helper methods for filesystem handling,
  *  time manipulations, and array operations.
  *
- * @package juvo\AS_Processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor;

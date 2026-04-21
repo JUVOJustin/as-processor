@@ -3,7 +3,7 @@
  * Provides an abstract base class for synchronization processes that interact with Action Scheduler.
  * This class establishes hooks and manages the synchronization lifecycle using Action Scheduler.
  *
- * @package juvo/as-processor
+ * @package juvo/as-processor-core
  */
 
 namespace juvo\AS_Processor;
@@ -52,7 +52,7 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  * - `on_finish()` - Called when all actions complete
  * - `on_fail()` - Called when an action fails
  *
- * @package juvo/as-processor
+ * @package juvo/as-processor-core
  */
 abstract class Sync implements Syncable {
 

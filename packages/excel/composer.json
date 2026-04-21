@@ -1,0 +1,17 @@
+{
+    "name": "juvo/as-processor-excel",
+    "description": "Excel import adapter for AS Processor.",
+    "type": "library",
+    "license": "GPL-3.0-or-later",
+    "version": "1.0.x-dev",
+    "require": {
+        "php": ">=8.1.0",
+        "juvo/as-processor-core": "^1.0@dev",
+        "phpoffice/phpspreadsheet": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "juvo\\AS_Processor\\": "src/"
+        }
+    }
+}
