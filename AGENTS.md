@@ -120,7 +120,7 @@ The shared helpers live in `tests/e2e/demo-plugin/tests/support/`:
 | `Excel_Import_Test.php` | `Product_Excel_Import` | 10 rows | 2 | dispatcher → 2 chunks |
 | `API_Import_Test.php` | `Product_API_Import` | 35 items, 10/page | varies | 4 paginated fetches + chunks |
 | `Sync_Lifecycle_Test.php` | CSV sync | 15 rows | 3 | `/start`, `/complete`, `/finish` |
-| `Chunk_Database_Test.php` | CSV sync | 15 rows | 3 | `Chunk_DB` stats API |
+| `Chunk_Database_Test.php` | CSV sync + cleanup | 15 rows | 3 | `Chunk_DB` stats API + `asp/cleanup` |
 | `Comprehensive_Workflow_Test.php` | All four | Combined | — | End-to-end with no cross-contamination |
 
 ## Continuous integration

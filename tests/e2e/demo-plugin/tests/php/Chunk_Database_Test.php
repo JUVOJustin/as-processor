@@ -35,4 +35,72 @@ class Chunk_Database_Test extends E2E_Test_Case {
 		$this->assertNotNull( Chunk_DB::db()->get_fastest_action( $group ) );
 		$this->assertNotNull( Chunk_DB::db()->get_slowest_action( $group ) );
 	}
+
+	public function test_asp_cleanup_action_removes_only_old_chunks_for_the_filtered_status(): void {
+		global $wpdb;
+
+		$table = Chunk_DB::db()->get_table_name();
+
+		$old_finished_group    = 'cleanup_old_finished';
+		$recent_finished_group = 'cleanup_recent_finished';
+		$old_failed_group      = 'cleanup_old_failed';
+
+		$old_start        = (string) ( time() - ( 2 * DAY_IN_SECONDS ) );
+		$recent_start     = (string) time();
+		$old_created_at   = gmdate( 'Y-m-d H:i:s', time() - ( 2 * DAY_IN_SECONDS ) );
+		$recent_created_at = gmdate( 'Y-m-d H:i:s' );
+
+		$wpdb->insert(
+			$table,
+			array(
+				'group'      => $old_finished_group,
+				'status'     => ProcessStatus::FINISHED->value,
+				'data'       => wp_json_encode( array( 'row' => 'old-finished' ) ),
+				'start'      => $old_start,
+				'end'        => $old_start,
+				'created_at' => $old_created_at,
+			),
+		);
+
+		$wpdb->insert(
+			$table,
+			array(
+				'group'      => $recent_finished_group,
+				'status'     => ProcessStatus::FINISHED->value,
+				'data'       => wp_json_encode( array( 'row' => 'recent-finished' ) ),
+				'start'      => $recent_start,
+				'end'        => $recent_start,
+				'created_at' => $recent_created_at,
+			),
+		);
+
+		$wpdb->insert(
+			$table,
+			array(
+				'group'      => $old_failed_group,
+				'status'     => ProcessStatus::FAILED->value,
+				'data'       => wp_json_encode( array( 'row' => 'old-failed' ) ),
+				'start'      => $old_start,
+				'end'        => $old_start,
+				'created_at' => $old_created_at,
+			),
+		);
+
+		$interval_filter = static fn (): int => DAY_IN_SECONDS;
+		$status_filter   = static fn (): ProcessStatus => ProcessStatus::FINISHED;
+
+		add_filter( 'asp/chunks/cleanup/interval', $interval_filter );
+		add_filter( 'asp/chunks/cleanup/status', $status_filter );
+
+		$this->assertNotFalse( has_action( 'asp/cleanup' ) );
+
+		do_action( 'asp/cleanup' );
+
+		remove_filter( 'asp/chunks/cleanup/interval', $interval_filter );
+		remove_filter( 'asp/chunks/cleanup/status', $status_filter );
+
+		$this->assertSame( 0, Chunk_DB::db()->get_total_actions( $old_finished_group ) );
+		$this->assertSame( 1, Chunk_DB::db()->get_total_actions( $recent_finished_group ) );
+		$this->assertSame( 1, Chunk_DB::db()->get_total_actions( $old_failed_group ) );
+	}
 }
