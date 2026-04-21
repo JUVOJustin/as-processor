@@ -3,6 +3,11 @@
 # who install via `composer require juvo/as-processor` should never see them.
 
 /tests                  export-ignore
+/packages/api           export-ignore
+/packages/csv           export-ignore
+/packages/excel         export-ignore
+/packages/json          export-ignore
+/packages/core/tests    export-ignore
 /.github                export-ignore
 /.ddev                  export-ignore
 /.claude                export-ignore

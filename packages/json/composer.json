@@ -1,0 +1,16 @@
+{
+    "name": "juvo/as-processor-json",
+    "description": "JSON import adapter for AS Processor.",
+    "type": "library",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.1.0",
+        "juvo/as-processor": "@dev",
+        "halaxa/json-machine": "^1.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "juvo\\AS_Processor\\": "src/"
+        }
+    }
+}

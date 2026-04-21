@@ -1,14 +1,12 @@
 {
     "name": "juvo/as-processor",
-    "description": "Process huge datasets for import or sync with ease.",
-    "keywords"    : [ "wordpress", "action scheduler", "scheduler", "data" ],
+    "description": "Core synchronization, chunking, and tracking runtime for AS Processor.",
+    "keywords": ["wordpress", "action scheduler", "scheduler", "data"],
     "license": "GPL-3.0-or-later",
+    "type": "library",
     "require": {
         "php": ">=8.1.0",
-        "woocommerce/action-scheduler": "^3.7",
-        "league/csv": "^9.0",
-        "phpoffice/phpspreadsheet": "^2.1",
-        "halaxa/json-machine": "^1.2"
+        "woocommerce/action-scheduler": "^3.7"
     },
     "support"     : {
         "issues" : "https://github.com/JUVOJustin/wp-secure-actions/issues"
@@ -22,19 +20,54 @@
     ],
     "autoload": {
         "psr-4": {
-            "juvo\\AS_Processor\\": "src/"
+            "juvo\\AS_Processor\\": "packages/core/src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "juvo\\AS_Processor\\Tests\\": "tests/"
+            "juvo\\AS_Processor\\Tests\\": "packages/core/tests/"
+        }
+    },
+    "repositories": {
+        "as-processor-csv": {
+            "type": "path",
+            "url": "packages/csv",
+            "options": {
+                "symlink": true
+            }
+        },
+        "as-processor-excel": {
+            "type": "path",
+            "url": "packages/excel",
+            "options": {
+                "symlink": true
+            }
+        },
+        "as-processor-json": {
+            "type": "path",
+            "url": "packages/json",
+            "options": {
+                "symlink": true
+            }
+        },
+        "as-processor-api": {
+            "type": "path",
+            "url": "packages/api",
+            "options": {
+                "symlink": true
+            }
         }
     },
     "require-dev": {
+        "juvo/as-processor-csv": "@dev",
+        "juvo/as-processor-excel": "@dev",
+        "juvo/as-processor-json": "@dev",
+        "juvo/as-processor-api": "@dev",
         "phpstan/phpstan": "^1.10.6",
         "szepeviktor/phpstan-wordpress": "^v1.1.7",
         "phpstan/extension-installer": "^1.1",
         "phpunit/phpunit": "^9.6",
+        "symplify/monorepo-builder": "^11.2",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "config": {
@@ -46,8 +79,15 @@
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
     },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "archive": {
         "exclude": [
+            "/packages/api",
+            "/packages/csv",
+            "/packages/excel",
+            "/packages/json",
+            "/packages/core/tests",
             "/tests",
             "/.github",
             "/.ddev",
@@ -60,7 +100,12 @@
         ]
     },
     "scripts": {
-        "test:unit": "@php ./vendor/bin/phpunit tests",
+        "monorepo-builder": "@php ./vendor/bin/monorepo-builder",
+        "monorepo:validate": "@monorepo-builder validate",
+        "monorepo:localize": "@monorepo-builder localize-composer-paths",
+        "monorepo:propagate": "@monorepo-builder propagate",
+        "monorepo:package-alias": "@monorepo-builder package-alias",
+        "test:unit": "@php ./vendor/bin/phpunit -c phpunit.xml",
         "phpstan": "@php ./vendor/bin/phpstan analyse",
         "phpstan:ci": "@php ./vendor/bin/phpstan analyse --error-format=checkstyle | cs2pr",
         "phpcs": "@php ./vendor/bin/phpcs --report-full",

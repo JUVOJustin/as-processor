@@ -37,7 +37,7 @@ jobs:
         id: cache
 
       - name: PHPSTAN
-        run: composer run phpstan:ci
+        run: composer run monorepo:validate && composer run phpstan:ci
 
       - name: PHPCS
         id: phpcs

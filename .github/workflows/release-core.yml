@@ -1,0 +1,15 @@
+name: Release Core Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  notify-packagist:
+    if: ${{ vars.PACKAGIST_UPDATE_URL_CORE != '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify Packagist
+        run: curl -XPOST --fail --silent --show-error "${{ vars.PACKAGIST_UPDATE_URL_CORE }}"
