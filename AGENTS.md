@@ -128,8 +128,8 @@ The shared helpers live in `tests/e2e/demo-plugin/tests/support/`:
 `.github/workflows/test-analyse.yml` runs three sequential jobs:
 
 1. **`call-install-deps`** — shared install step from `install-deps.yml`.
-2. **`test`** — PHPStan, PHPCS, then starts wp-env and runs the unit suite inside `tests-cli`.
-3. **`e2e`** — starts wp-env, runs `npm run test:e2e`, stops wp-env. Only runs if `test` passes.
+2. **`test`** — PHPStan and PHPCS.
+3. **`wp-env-tests`** — starts wp-env once and runs both the unit and E2E suites inside `tests-cli` after the static checks pass.
 
 ## Code changes
 
