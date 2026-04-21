@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/wp-env.json",
+  "core": null,
+  "phpVersion": "8.1",
+  "mappings": {
+    "wp-content/plugins/as-processor-demo": "./tests/e2e/demo-plugin",
+    "wp-content/plugins/as-processor-library-src": "."
+  }
+}

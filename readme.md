@@ -1,4 +1,29 @@
-The **AS Processor** library is a robust synchronization and data chunking framework designed specifically for WordPress environments. Leveraging asynchronous task management through the Action Scheduler, it provides a flexible and efficient orchestration for large-scale data processing tasks, such as API synchronizations, file-based (CSV, Excel, JSON) imports, and seamless chunk-wise data management.
+The **AS Processor** library is a robust synchronization and data chunking framework designed specifically for WordPress environments. Leveraging asynchronous task management through Action Scheduler, it provides a flexible and efficient orchestration layer for large-scale data processing tasks such as API synchronizations, file-based (CSV, Excel, JSON) imports, and chunk-wise data management.
+
+### Installation
+
+Install the package with Composer:
+
+```bash
+composer require juvo/as-processor
+```
+
+The package ships with runtime support for Action Scheduler integrations plus CSV, Excel, JSON, and API-driven imports.
+
+Development and test assets stay in the repository, but they are excluded from package archives and production autoloading. Consumers only get the runtime library under `src/`.
+
+### Testing
+
+The repository includes two PHPUnit 9 test suites, and both run inside the `wp-env` `tests-cli` container.
+
+```bash
+npm install
+npm run env:start
+npm test
+npm run env:stop
+```
+
+The unit suite runs from the library root inside `wp-env`, while the application suite runs from the demo plugin fixture. The end-to-end suite schedules real Action Scheduler jobs, verifies they were queued, executes them through the queue runner, and asserts the final imported WordPress data.
 
 ### Core Features
 1. **Data Chunking and Processing**:
@@ -41,13 +66,13 @@ The **AS Processor** library is a robust synchronization and data chunking frame
     - The `Sync_Data` trait provides reliable synchronization data storage using WordPress's transients, enabling flexible data sharing and locking mechanisms.
 
 2. **Focus on Memory Efficiency**:
-    - Uses iterative processing (e.g., PHP Generators, chunk-based file reading) to minimize memory usage and ensure scalability for large datasets.
+    - Uses iterative processing (e.g. PHP Generators, chunk-based file reading) to minimize memory usage and ensure scalability for large datasets.
 
 3. **Modular Design**:
     - The clean separation of concerns allows developers to modify or extend specific aspects like chunk processing or API fetching independently.
 
 4. **Action Scheduler Integration**:
-    - Uses the Action Scheduler's event-driven architecture to manage background tasks effectively, along with group-level synchronization to maintain context-aware processing.
+    - Uses Action Scheduler's event-driven architecture to manage background tasks effectively, along with group-level synchronization to maintain context-aware processing.
 
 ### Available Lifecycle Hooks
 The library provides several WordPress action hooks that fire during the synchronization lifecycle, allowing developers to hook into different stages of the sync process:
@@ -67,7 +92,7 @@ This library is an excellent choice for WordPress developers and enterprises dea
 - High-volume data integration from various sources.
 - Automating repetitive and resource-intensive synchronization tasks.
 - Optimizing workflows for applications that rely on large datasets or slow APIs.
-- Frequent e-commerce product imports
+- Frequent e-commerce product imports.
 
 AS Processor combines the power of modern WordPress development practices, Action Scheduler's asynchronous processing capabilities, and a highly abstracted framework to enable seamless and fault-tolerant data processing at scale. It offers developers a solid foundation for building efficient, scalable synchronization solutions tailored to their applications' unique requirements.
 
@@ -86,7 +111,7 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 
 #### `{sync_name}/complete`
 **When**: Fired for **each** sync-owned action upon successful completion (triggered by Action Scheduler's native `action_scheduler_completed_action` hook)  
-**Parameters**: 
+**Parameters**:
 - `ActionScheduler_Action $action` - The completed action object
 - `int $action_id` - The ID of the action
 
@@ -144,7 +169,7 @@ add_action( 'my_custom_sync/complete', function( $action, $action_id ) {
 // Final cleanup when ALL actions are finished
 add_action( 'my_custom_sync/finish', function( $group_name ) {
     error_log( "All actions in group $group_name are finished!" );
- } );
+} );
 
 // Handle failures
 add_action( 'my_custom_sync/fail', function( $action, $exception, $action_id ) {

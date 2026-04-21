@@ -1,0 +1,16 @@
+sku,name,price,category,stock
+SKU-001,Premium Wireless Headphones,149.99,Electronics,45
+SKU-002,Ergonomic Office Chair,299.00,Furniture,12
+SKU-003,Organic Cotton T-Shirt,29.99,Clothing,150
+SKU-004,Stainless Steel Water Bottle,24.95,Accessories,200
+SKU-005,4K Webcam,89.99,Electronics,30
+SKU-006,Yoga Mat,35.00,Fitness,75
+SKU-007,Bluetooth Speaker,59.99,Electronics,60
+SKU-008,Running Shoes,129.95,Clothing,40
+SKU-009,Desk Lamp,45.00,Furniture,25
+SKU-010,USB-C Hub,79.99,Electronics,18
+SKU-011,Leather Notebook,19.99,Stationery,100
+SKU-012,Fitness Tracker,199.00,Electronics,22
+SKU-013,Ceramic Coffee Mug,14.95,Kitchen,80
+SKU-014,Wireless Mouse,39.99,Electronics,55
+SKU-015,Portable SSD,119.00,Electronics,15

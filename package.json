@@ -1,0 +1,18 @@
+{
+  "name": "as-processor",
+  "version": "1.0.0",
+  "description": "Tooling for the AS Processor library test environment.",
+  "private": true,
+  "scripts": {
+    "env:start": "wp-env start --update",
+    "env:stop": "wp-env stop",
+    "env:destroy": "wp-env destroy",
+    "env:cli": "wp-env run cli --env-cwd=wp-content/plugins/as-processor-demo",
+    "test:unit": "wp-env run tests-cli --env-cwd=wp-content/plugins/as-processor-library-src bash -lc 'composer install --no-interaction && vendor/bin/phpunit -c phpunit.xml'",
+    "test:e2e": "wp-env run tests-cli --env-cwd=wp-content/plugins/as-processor-demo bash -lc 'composer install --no-interaction && composer install --working-dir=tests --no-interaction && tests/vendor/bin/phpunit -c tests/phpunit.xml'",
+    "test": "npm run test:unit && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@wordpress/env": "^10.18.0"
+  }
+}

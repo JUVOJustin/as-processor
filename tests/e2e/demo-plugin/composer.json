@@ -1,0 +1,37 @@
+{
+    "name": "juvo/as-processor-demo",
+    "description": "Demo plugin for the AS Processor library. Used as an application-test fixture.",
+    "type": "wordpress-plugin",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.1",
+        "juvo/as-processor": "@dev"
+    },
+    "repositories": {
+        "as-processor-local": {
+            "type": "path",
+            "url": "../as-processor-library-src",
+            "options": {
+                "symlink": false
+            }
+        },
+        "packagist-filtered": {
+            "type": "composer",
+            "url": "https://repo.packagist.org",
+            "exclude": ["juvo/as-processor"]
+        },
+        "packagist.org": false
+    },
+    "autoload": {
+        "psr-4": {
+            "AS_Processor_Demo\\": "src/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "composer/installers": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
