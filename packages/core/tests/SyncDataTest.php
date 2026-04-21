@@ -9,6 +9,10 @@ class SyncDataTest extends TestCase
 {
 	use Sync_Data;
 
+	protected int $action_id = 0;
+
+	protected function log( string $message, int $log_level = E_USER_NOTICE, ?string $function_name = null ): void {}
+
 	/**
 	 * Test that short lock keys are returned unchanged
 	 */

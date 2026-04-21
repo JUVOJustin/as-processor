@@ -7,8 +7,7 @@
          testdox="true">
     <testsuites>
         <testsuite name="unit">
-            <directory>tests</directory>
-            <exclude>tests/e2e</exclude>
+            <directory>packages/core/tests</directory>
         </testsuite>
     </testsuites>
 

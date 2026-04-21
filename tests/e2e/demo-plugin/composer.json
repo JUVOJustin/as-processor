@@ -5,18 +5,21 @@
     "license": "GPL-3.0-or-later",
     "require": {
         "php": ">=8.1",
-        "juvo/as-processor-core": "@dev",
+        "juvo/as-processor": "@dev",
         "juvo/as-processor-csv": "@dev",
         "juvo/as-processor-excel": "@dev",
         "juvo/as-processor-json": "@dev",
         "juvo/as-processor-api": "@dev"
     },
     "repositories": {
-        "as-processor-core": {
+        "as-processor": {
             "type": "path",
-            "url": "../as-processor-library-src/packages/core",
+            "url": "../as-processor-library-src",
             "options": {
-                "symlink": false
+                "symlink": false,
+                "versions": {
+                    "juvo/as-processor": "1.0.x-dev"
+                }
             }
         },
         "as-processor-csv": {
@@ -50,7 +53,7 @@
         "packagist-filtered": {
             "type": "composer",
             "url": "https://repo.packagist.org",
-            "exclude": ["juvo/as-processor-core", "juvo/as-processor-csv", "juvo/as-processor-excel", "juvo/as-processor-json", "juvo/as-processor-api"]
+            "exclude": ["juvo/as-processor", "juvo/as-processor-csv", "juvo/as-processor-excel", "juvo/as-processor-json", "juvo/as-processor-api"]
         },
         "packagist.org": false
     },

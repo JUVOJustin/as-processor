@@ -2,7 +2,7 @@
 
 This repository ships with two PHPUnit 9 test suites, and both run inside the `@wordpress/env` `tests-cli` container:
 
-1. **Unit tests** (`tests/*.php`) — run from the library root with the root `phpunit.xml`.
+1. **Unit tests** (`packages/core/tests/*.php`) — run from the library root with the root `phpunit.xml`.
 2. **Application tests** (`tests/e2e/demo-plugin/tests/php/*.php`) — run from the demo plugin fixture against a real WordPress instance. A demo plugin inside the same folder acts as the test fixture and exercises every feature of the library.
 
 ## Layout
@@ -13,8 +13,8 @@ package.json                              # env:*, test:unit, test:e2e
 phpunit.xml                               # Unit test config (repository root, PHPUnit 9)
 packages/
 ├── core/
-│   ├── composer.json
-│   └── src/
+│   ├── src/
+│   └── tests/                           # Core unit tests
 ├── csv/
 │   ├── composer.json
 │   └── src/
@@ -28,8 +28,6 @@ packages/
     ├── composer.json
     └── src/
 tests/
-├── HelperTest.php                        # Unit tests
-├── SyncDataTest.php
 └── e2e/
     └── demo-plugin/                      # Full WordPress plugin, mapped into wp-env
         ├── as-processor-demo.php         # Plugin bootstrap
@@ -52,9 +50,9 @@ tests/
             └── php/                      # Integration tests
 ```
 
-The runtime is split into Composer subpackages under `packages/`. The demo plugin installs those packages directly through path repositories inside the container, while the repository root remains the developer-facing bundle package. The extra `.wp-env.json` mapping exposes the monorepo source to Composer inside the container. Action Scheduler remains a transitive dependency of the split runtime.
+The runtime is split into Composer packages under `packages/`, with the repository root serving as the `juvo/as-processor` core package. The demo plugin installs that root package plus the adapter packages directly through path repositories inside the container. The extra `.wp-env.json` mapping exposes the monorepo source to Composer inside the container. Action Scheduler remains a transitive dependency of the core runtime.
 
-Test code is not part of the delivered runtime package. The root `composer.json` keeps `tests/` in `autoload-dev`, `.gitattributes` marks test and tooling files as `export-ignore`, and Composer archive exclusions mirror that packaging boundary.
+Test code is not part of the delivered runtime package. The root `composer.json` keeps `packages/core/tests/` in `autoload-dev`, `.gitattributes` marks test and tooling files as `export-ignore`, and Composer archive exclusions mirror that packaging boundary.
 
 ## Running tests
 
@@ -72,7 +70,7 @@ npm run test:unit
 npm run env:stop
 ```
 
-`test:unit` runs inside the wp-env `tests-cli` container with `--env-cwd=wp-content/plugins/as-processor-library-src`. It performs a root `composer install` in the container, which resolves the local package paths under `packages/`, and then executes PHPUnit against the root `phpunit.xml`.
+`test:unit` runs inside the wp-env `tests-cli` container with `--env-cwd=wp-content/plugins/as-processor-library-src`. It performs a root `composer install` in the container, which resolves the local package paths under `packages/`, and then executes PHPUnit against the root `phpunit.xml` for the tests in `packages/core/tests`.
 
 ### Application (E2E) tests
 

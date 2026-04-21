@@ -9,31 +9,29 @@ AS Processor is a WordPress-focused synchronization framework built on top of Ac
 
 ## Packages
 
-- `juvo/as-processor-core`: Sync lifecycle, chunk scheduling, tracking tables, entities, stats, and shared helpers.
+- `juvo/as-processor`: Sync lifecycle, chunk scheduling, tracking tables, entities, stats, and shared helpers.
 - `juvo/as-processor-csv`: CSV import adapter built on `league/csv`.
 - `juvo/as-processor-excel`: Excel import adapter built on `phpoffice/phpspreadsheet`.
 - `juvo/as-processor-json`: JSON import adapter built on `halaxa/json-machine`.
 - `juvo/as-processor-api`: Paginated API import adapter.
-- `juvo/as-processor`: Convenience bundle that requires all of the packages above.
 
 All packages keep the existing `juvo\\AS_Processor\\...` namespace, so the install surface changes without forcing application code to rename classes.
 
 ## Installation
 
-Install only the runtime you need:
+Install the core runtime:
 
 ```bash
-composer require juvo/as-processor-core
+composer require juvo/as-processor
+```
+
+Install optional adapters as needed:
+
+```bash
 composer require juvo/as-processor-csv
 composer require juvo/as-processor-excel
 composer require juvo/as-processor-json
 composer require juvo/as-processor-api
-```
-
-Install the full bundle when you want every adapter:
-
-```bash
-composer require juvo/as-processor
 ```
 
 ## Repository Layout
@@ -41,8 +39,8 @@ composer require juvo/as-processor
 ```text
 packages/
 ├── core/
-│   ├── composer.json
-│   └── src/
+│   ├── src/
+│   └── tests/
 ├── csv/
 │   ├── composer.json
 │   └── src/
@@ -59,7 +57,7 @@ tests/
 └── e2e/demo-plugin/
 ```
 
-The root `composer.json` is the install-all bundle used for local development and for users who want the previous monolithic install experience.
+The root `composer.json` is the core package and developer entry point for the monorepo.
 
 ## Testing
 
@@ -72,10 +70,10 @@ npm test
 npm run env:stop
 ```
 
-- `npm run test:unit`: installs the root bundle and runs the root `phpunit.xml`.
+- `npm run test:unit`: installs the root core package and runs the core unit tests from `packages/core/tests` through the root `phpunit.xml`.
 - `npm run test:e2e`: installs the split packages into the demo plugin fixture and runs the WordPress integration suite.
 
 ## Notes
 
 - The demo plugin consumes the split packages directly so the application suite verifies the new package boundaries.
-- The root bundle remains the easiest backwards-compatible install path for users who want all adapters together.
+- Consumers install `juvo/as-processor` first, then add only the adapter packages they need.
