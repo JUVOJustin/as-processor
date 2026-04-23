@@ -49,7 +49,7 @@ trait Sync_Data {
 	 */
 	public function get_sync_data_name(): string {
 		// Set sync data key to the group name by default. Sequential Sync does not have a group name
-		if ( empty( $this->sync_data_name ) && method_exists( $this, 'get_sync_group_name' ) ) {
+		if ( empty( $this->sync_data_name ) ) {
 			$this->sync_data_name = $this->get_sync_group_name();
 			return $this->sync_data_name;
 		}

@@ -99,6 +99,7 @@ final class Plugin {
 			new Lead_JSON_Import(),
 			new Product_Excel_Import(),
 			new Product_API_Import(),
+			new Combined_Sequential_Import(),
 		);
 	}
 }

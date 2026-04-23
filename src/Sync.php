@@ -30,7 +30,7 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  *
  * ### Per-Action Hooks
  * - `{sync_name}/complete` - Fires for each completed action in the sync group
- *   Parameters: int $action_id
+ *   Parameters: ActionScheduler_Action $action, int $action_id
  *
  * ### Group-Level Hooks
  * - `{sync_name}/finish` - Fires once when all actions in the group are complete
@@ -227,6 +227,12 @@ abstract class Sync implements Syncable {
 
 		// Fire per-action completion hook
 		do_action( $this->get_sync_name() . '/complete', $action, $action_id );
+
+		if ( ! $this->should_trigger_finish( $action ) ) {
+			return;
+		}
+
+		do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
 	}
 
 	/**
@@ -389,6 +395,11 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
+		$group_name = $chunk->get_group();
+		if ( empty( $group_name ) || ! str_starts_with( $group_name, $this->get_sync_name() . '_' ) ) {
+			return;
+		}
+
 		$chunk->set_status( ProcessStatus::DELETED );
 		$chunk->set_end();
 		$chunk->save();
@@ -435,6 +446,36 @@ abstract class Sync implements Syncable {
 			),
 			$log_level
 		);
+	}
+
+	/**
+	 * Determines whether the current completion event should trigger the final finish hook.
+	 *
+	 * The base Sync implementation considers a sync finished once no pending or running
+	 * actions remain in the current group. Import variants can override this to add
+	 * additional completion prerequisites.
+	 *
+	 * @param ActionScheduler_Action $action The action that just completed.
+	 * @return bool
+	 */
+	protected function should_trigger_finish( ActionScheduler_Action $action ): bool {
+		$group_name = $action->get_group();
+
+		if ( empty( $group_name ) ) {
+			return false;
+		}
+
+		$this->sync_group_name = $group_name;
+
+		$remaining_actions = $this->get_actions(
+			array(
+				ActionScheduler_Store::STATUS_PENDING,
+				ActionScheduler_Store::STATUS_RUNNING,
+			),
+			1
+		);
+
+		return empty( $remaining_actions );
 	}
 
 	/**

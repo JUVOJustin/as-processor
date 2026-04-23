@@ -13,10 +13,13 @@
 namespace AS_Processor_Demo\Tests\Support;
 
 use ActionScheduler_Store;
+use AS_Processor_Demo\Combined_Sequential_Import;
 use AS_Processor_Demo\Lead_JSON_Import;
 use AS_Processor_Demo\Product_API_Import;
 use AS_Processor_Demo\Product_CSV_Import;
 use AS_Processor_Demo\Product_Excel_Import;
+use AS_Processor_Demo\Sequential_Lead_JSON_Import;
+use AS_Processor_Demo\Sequential_Product_CSV_Import;
 use AS_Processor_Demo\Support\Demo_Fixture_Manager;
 use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\DB\Data_DB;
@@ -31,6 +34,7 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 		parent::set_up();
 
 		Demo_Fixture_Manager::cleanup_runtime_copies();
+		$this->cleanup_demo_posts();
 		$this->cleanup_tracking_tables();
 		$this->cleanup_pending_actions();
 	}
@@ -41,9 +45,30 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	public function tear_down(): void {
 		$this->cleanup_pending_actions();
 		$this->cleanup_tracking_tables();
+		$this->cleanup_demo_posts();
 		Demo_Fixture_Manager::cleanup_runtime_copies();
 
 		parent::tear_down();
+	}
+
+	/**
+	 * Remove demo posts so each test asserts against a clean content state.
+	 */
+	protected function cleanup_demo_posts(): void {
+		foreach ( array( 'asp_product', 'asp_lead', 'asp_api_item' ) as $post_type ) {
+			$post_ids = get_posts(
+				array(
+					'post_type'      => $post_type,
+					'post_status'    => 'any',
+					'posts_per_page' => -1,
+					'fields'         => 'ids',
+				)
+			);
+
+			foreach ( $post_ids as $post_id ) {
+				wp_delete_post( (int) $post_id, true );
+			}
+		}
 	}
 
 	/**
@@ -225,6 +250,9 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 			Lead_JSON_Import::SYNC_NAME,
 			Product_Excel_Import::SYNC_NAME,
 			Product_API_Import::SYNC_NAME,
+			Combined_Sequential_Import::SYNC_NAME,
+			Sequential_Product_CSV_Import::SYNC_NAME,
+			Sequential_Lead_JSON_Import::SYNC_NAME,
 		);
 	}
 }
