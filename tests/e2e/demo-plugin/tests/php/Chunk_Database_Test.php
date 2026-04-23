@@ -45,9 +45,9 @@ class Chunk_Database_Test extends E2E_Test_Case {
 		$recent_finished_group = 'cleanup_recent_finished';
 		$old_failed_group      = 'cleanup_old_failed';
 
-		$old_start         = (string) ( time() - ( 2 * DAY_IN_SECONDS ) );
-		$recent_start      = (string) time();
-		$old_created_at    = gmdate( 'Y-m-d H:i:s', time() - ( 2 * DAY_IN_SECONDS ) );
+		$old_start        = (string) ( time() - ( 2 * DAY_IN_SECONDS ) );
+		$recent_start     = (string) time();
+		$old_created_at   = gmdate( 'Y-m-d H:i:s', time() - ( 2 * DAY_IN_SECONDS ) );
 		$recent_created_at = gmdate( 'Y-m-d H:i:s' );
 
 		$wpdb->insert(

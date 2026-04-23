@@ -79,8 +79,7 @@ The library provides several WordPress action hooks that fire during the synchro
 
 - **`{sync_name}/start`**: Fires when any Action Scheduler action belonging to the sync begins execution (both dispatcher/root actions and chunk processing actions). Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
 - **`{sync_name}/process_chunk`**: Fires to process an individual chunk. Receives `int $chunk_id` as parameter.
-- **`{sync_name}/complete`**: Fires for each sync-owned action that completes successfully. Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
-- **`{sync_name}/finish`**: Fires once when all actions in the sync group have completed successfully. Receives `string $sync_group_name` as parameter.
+- **`{sync_name}/complete`**: Fires when all actions in the sync group have completed successfully. Receives `string $sync_group_name` as parameter.
 - **`{sync_name}/fail`**: Fires when an action fails with an exception. Receives `ActionScheduler_Action $action`, `Exception $e`, and `int $action_id` as parameters.
 - **`{sync_name}/timeout`**: Fires when an action times out. Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
 - **`{sync_name}/cancel`**: Fires when an action is canceled. Receives `ActionScheduler_Action $action` and `int $action_id` as parameters.
@@ -107,9 +106,7 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 
 #### `{sync_name}/start`
 **When**: Fired when an action begins execution  
-**Parameters**:
-- `ActionScheduler_Action $action` - The action that started
-- `int $action_id` - The ID of the action  
+**Parameters**: None (triggered via `track_action_start`)  
 **Use case**: Log the start of processing, set up temporary resources, or track progress
 
 #### `{sync_name}/complete`
@@ -167,7 +164,7 @@ The `Sync` class provides a comprehensive set of lifecycle hooks that allow you 
 // Track progress for each completed action
 add_action( 'my_custom_sync/complete', function( $action, $action_id ) {
     error_log( "Action $action_id completed. Belongs to group {$action->get_group()}." );
-}, 10, 2 );
+}, 10, 1 );
 
 // Final cleanup when ALL actions are finished
 add_action( 'my_custom_sync/finish', function( $group_name ) {

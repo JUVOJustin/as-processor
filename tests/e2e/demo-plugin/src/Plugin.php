@@ -95,7 +95,6 @@ final class Plugin {
 		}
 
 		$this->imports = array(
-			new Combined_Sequential_Import(),
 			new Product_CSV_Import(),
 			new Lead_JSON_Import(),
 			new Product_Excel_Import(),
