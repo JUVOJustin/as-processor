@@ -12,6 +12,20 @@ The package ships with runtime support for Action Scheduler integrations plus CS
 
 Development and test assets stay in the repository, but they are excluded from package archives and production autoloading. Consumers only get the runtime library under `src/`.
 
+### Bootstrap
+
+Register the shared runtime hooks from your plugin bootstrap:
+
+```php
+use juvo\AS_Processor\AS_Processor;
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+AS_Processor::register();
+```
+
+See [Bootstrap AS Processor](docs/bootstrap.md) for details.
+
 ### Testing
 
 The repository includes two PHPUnit 9 test suites, and both run inside the `wp-env` `tests-cli` container.
@@ -47,7 +61,7 @@ The unit suite runs from the library root inside `wp-env`, while the application
 
 5. **Reliable Sync Management**:
     - Built-in sync lifecycle management, including hooks for starting, progressing, and completing synchronizations.
-    - Automatic cleanup of completed tasks and retention of synchronization data for specified durations.
+    - Automatic cleanup of completed tasks and retention of synchronization data for specified durations after `AS_Processor::register()` is called from the host plugin.
 
 6. **Error Handling and Recovery**:
     - Exception handling is seamlessly integrated at every critical stage, ensuring the process fails gracefully and any issues are recorded for diagnosis.

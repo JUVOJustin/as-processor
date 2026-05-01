@@ -12,6 +12,8 @@
 
 namespace AS_Processor_Demo;
 
+use juvo\AS_Processor\AS_Processor;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -29,6 +31,8 @@ if ( ! file_exists( $autoload ) ) {
 
 require_once $autoload;
 require_once __DIR__ . '/vendor/woocommerce/action-scheduler/action-scheduler.php';
+
+AS_Processor::register();
 
 define( 'ASP_DEMO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ASP_DEMO_DATA_DIR', ASP_DEMO_PLUGIN_DIR . 'data/' );
