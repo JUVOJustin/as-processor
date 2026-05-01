@@ -10,8 +10,10 @@ namespace AS_Processor_Demo\Tests\Integration;
 
 use AS_Processor_Demo\Product_CSV_Import;
 use AS_Processor_Demo\Tests\Support\E2E_Test_Case;
+use juvo\AS_Processor\AS_Processor;
 use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\Entities\ProcessStatus;
+use WP_Hook;
 
 /**
  * @group database
@@ -102,5 +104,46 @@ class Chunk_Database_Test extends E2E_Test_Case {
 		$this->assertSame( 0, Chunk_DB::db()->get_total_actions( $old_finished_group ) );
 		$this->assertSame( 1, Chunk_DB::db()->get_total_actions( $recent_finished_group ) );
 		$this->assertSame( 1, Chunk_DB::db()->get_total_actions( $old_failed_group ) );
+	}
+
+	public function test_action_scheduler_ensure_recurring_actions_schedules_asp_cleanup(): void {
+		as_unschedule_all_actions( 'asp/cleanup' );
+
+		$this->assertFalse( as_has_scheduled_action( 'asp/cleanup' ) );
+
+		do_action( 'action_scheduler_ensure_recurring_actions' );
+
+		$this->assertTrue( as_has_scheduled_action( 'asp/cleanup' ) );
+
+		as_unschedule_all_actions( 'asp/cleanup' );
+	}
+
+	public function test_as_processor_register_is_idempotent(): void {
+		$cleanup_callbacks   = $this->count_registered_callbacks( 'asp/cleanup' );
+		$recurring_callbacks = $this->count_registered_callbacks( 'action_scheduler_ensure_recurring_actions' );
+
+		AS_Processor::register();
+		AS_Processor::register();
+
+		$this->assertSame( $cleanup_callbacks, $this->count_registered_callbacks( 'asp/cleanup' ) );
+		$this->assertSame( $recurring_callbacks, $this->count_registered_callbacks( 'action_scheduler_ensure_recurring_actions' ) );
+		$this->assertSame( 10, has_action( 'asp/cleanup', array( AS_Processor::class, 'cleanup' ) ) );
+		$this->assertSame( 10, has_action( 'action_scheduler_ensure_recurring_actions', array( AS_Processor::class, 'ensure_recurring_actions' ) ) );
+	}
+
+	private function count_registered_callbacks( string $hook ): int {
+		global $wp_filter;
+
+		if ( empty( $wp_filter[ $hook ] ) || ! $wp_filter[ $hook ] instanceof WP_Hook ) {
+			return 0;
+		}
+
+		$count = 0;
+
+		foreach ( $wp_filter[ $hook ]->callbacks as $callbacks ) {
+			$count += count( $callbacks );
+		}
+
+		return $count;
 	}
 }
