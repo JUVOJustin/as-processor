@@ -11,7 +11,6 @@
 
 namespace juvo\AS_Processor;
 
-use ActionScheduler_Store;
 use Exception;
 use juvo\AS_Processor\DB\Chunk_DB;
 

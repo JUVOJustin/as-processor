@@ -45,4 +45,5 @@ require $tests_dir . '/includes/bootstrap.php';
 
 // Shared test-support helpers — load after WordPress so they can use its API.
 require_once __DIR__ . '/support/Action_Scheduler_Test_Helper.php';
+require_once __DIR__ . '/support/Parallel_Finish_Test_Sync.php';
 require_once __DIR__ . '/support/E2E_Test_Case.php';

@@ -84,7 +84,7 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 	public function __construct() {
 		parent::__construct();
 
-		$this->sync_data_name = $this->get_sync_name();
+		$this->set_sync_data_name( $this->get_sync_name() );
 
 		// Run always on initialisation
 		add_action(
@@ -109,11 +109,24 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 		$this->jobs = $this->get_jobs();
 
 		foreach ( $this->jobs as $job ) {
+			$this->prepare_job( $job );
+		}
+	}
 
-			// Overwrite sync data name to share data between jobs
-			$job->set_sync_data_name( $this->get_sync_name() );
+	/**
+	 * Prepare a child job for execution inside this sequence.
+	 *
+	 * @param Sync $job Child sync job.
+	 * @return void
+	 */
+	private function prepare_job( Sync $job ): void {
+		$job->set_sync_data_name( $this->get_sync_name() );
 
-			// Advance the sequence only once the current job fully finished.
+		if ( false === has_action( $job->get_sync_name() . '/finish', array( $job, 'on_finish' ) ) ) {
+			add_action( $job->get_sync_name() . '/finish', array( $job, 'on_finish' ) );
+		}
+
+		if ( false === has_action( $job->get_sync_name() . '/finish', array( $this, 'next' ) ) ) {
 			add_action( $job->get_sync_name() . '/finish', array( $this, 'next' ) );
 		}
 	}
@@ -202,6 +215,7 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 		}
 
 		foreach ( $jobs as $job ) {
+			$this->prepare_job( $job );
 			$this->enqueue( $job );
 		}
 

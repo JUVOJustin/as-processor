@@ -80,6 +80,8 @@ abstract class Sync implements Syncable {
 	 * @return void
 	 */
 	public function __construct() {
+		$this->sync_group_name = $this->generate_sync_group_name();
+		$this->set_sync_data_name( $this->sync_group_name );
 		$this->set_hooks();
 	}
 
@@ -121,15 +123,41 @@ abstract class Sync implements Syncable {
 	abstract protected function process_chunk( int $chunk_id ): void;
 
 	/**
-	 * Returns the sync group name. If none set it will generate one from the sync name and the current time
+	 * Returns the sync group name. If none is set, it generates one from the sync name and a UUID.
 	 *
 	 * @return string
 	 */
 	public function get_sync_group_name(): string {
-		if ( empty( $this->sync_group_name ) ) {
-			$this->sync_group_name = $this->get_sync_name() . '_' . time();
-		}
 		return $this->sync_group_name;
+	}
+
+	/**
+	 * Generate a unique Action Scheduler group name for this sync instance.
+	 *
+	 * @return string
+	 */
+	private function generate_sync_group_name(): string {
+		return sprintf(
+			'%s_%s',
+			$this->get_sync_name(),
+			str_replace( '-', '', wp_generate_uuid4() )
+		);
+	}
+
+	/**
+	 * Set the current Action Scheduler group and keep the default sync-data namespace aligned.
+	 *
+	 * @param string $sync_group_name Action Scheduler group name.
+	 * @return void
+	 */
+	private function set_sync_group_name( string $sync_group_name ): void {
+		$sync_data_follows_group = $this->get_sync_data_name() === $this->sync_group_name;
+
+		$this->sync_group_name = $sync_group_name;
+
+		if ( $sync_data_follows_group ) {
+			$this->set_sync_data_name( $sync_group_name );
+		}
 	}
 
 	/**
@@ -207,6 +235,10 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
+		if ( ! $this->mark_finish_ready() ) {
+			return;
+		}
+
 		do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
 	}
 
@@ -229,7 +261,9 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
-		$this->sync_group_name = $action->get_group();
+		if ( ! empty( $action->get_group() ) ) {
+			$this->set_sync_group_name( $action->get_group() );
+		}
 
 		// set the start time of the chunk
 		$action_arguments = $action->get_args();
@@ -416,7 +450,7 @@ abstract class Sync implements Syncable {
 			sprintf(
 				'[action_id: %d] [group: %s] %s',
 				$this->action_id,
-				$this->sync_group_name ?? 'undefined',
+				$this->sync_group_name,
 				$message
 			),
 			$log_level
@@ -440,7 +474,7 @@ abstract class Sync implements Syncable {
 			return false;
 		}
 
-		$this->sync_group_name = $group_name;
+		$this->set_sync_group_name( $group_name );
 
 		$remaining_actions = $this->get_actions(
 			array(
@@ -451,6 +485,43 @@ abstract class Sync implements Syncable {
 		);
 
 		return empty( $remaining_actions );
+	}
+
+	/**
+	 * Mark finish as ready exactly once for this sync group.
+	 *
+	 * @return bool True when this caller should fire the finish hook.
+	 * @throws Exception When sync data update or retrieval fails.
+	 */
+	protected function mark_finish_ready(): bool {
+		$finish_key = $this->get_finish_tracking_key();
+
+		$this->set_key_lock( $finish_key, true );
+
+		try {
+			if ( $this->get_sync_data( $finish_key ) ) {
+				return false;
+			}
+
+			$this->update_sync_data( $finish_key, time() );
+		} finally {
+			$this->set_key_lock( $finish_key, false );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Return the sync-data key used to track whether finish has fired.
+	 *
+	 * @return string
+	 */
+	private function get_finish_tracking_key(): string {
+		if ( $this->get_sync_data_name() === $this->get_sync_group_name() ) {
+			return 'finish_fired_at';
+		}
+
+		return $this->get_sync_group_name() . '_finish_fired_at';
 	}
 
 	/**

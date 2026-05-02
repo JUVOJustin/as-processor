@@ -42,17 +42,11 @@ trait Sync_Data {
 	}
 
 	/**
-	 * Returns the currently set sync data name. Defaults to the sync group name.
-	 * Since the name can be overwritten with the setter and the group name is retrieved from the "action_scheduler_before_execute"
+	 * Returns the currently set sync data name.
 	 *
 	 * @return string
 	 */
 	public function get_sync_data_name(): string {
-		// Set sync data key to the group name by default. Sequential Sync does not have a group name
-		if ( empty( $this->sync_data_name ) ) {
-			$this->sync_data_name = $this->get_sync_group_name();
-			return $this->sync_data_name;
-		}
 		return $this->sync_data_name;
 	}
 
