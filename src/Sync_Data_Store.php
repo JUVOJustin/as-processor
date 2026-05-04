@@ -28,18 +28,15 @@ class Sync_Data_Store {
 	private string $name;
 
 	/**
-	 * Current Action Scheduler action ID used to own fallback locks.
+	 * Current Action Scheduler action ID used only as the owner of fallback locks.
+	 *
+	 * Sync data itself is identified by the string namespace in $name. The
+	 * action ID is not part of the storage key; it is only written into the
+	 * transient-style lock value when database locks are unavailable.
 	 *
 	 * @var int
 	 */
 	private int $action_id = 0;
-
-	/**
-	 * Process-level owner token used before an action ID is available.
-	 *
-	 * @var string
-	 */
-	private string $owner_token;
 
 	/**
 	 * Create a store for one sync-data namespace.
@@ -47,8 +44,7 @@ class Sync_Data_Store {
 	 * @param string $name Namespace prefix.
 	 */
 	public function __construct( string $name ) {
-		$this->name        = $name;
-		$this->owner_token = uniqid( 'asp_sync_data_', true );
+		$this->name = $name;
 	}
 
 	/**
@@ -72,6 +68,9 @@ class Sync_Data_Store {
 
 	/**
 	 * Set the Action Scheduler action ID that owns fallback locks.
+	 *
+	 * This value is used by set_option_lock() only. Database locks are owned by
+	 * the database connection, and sync data keys remain string-based.
 	 *
 	 * @param int $action_id Action ID.
 	 * @return void
@@ -244,9 +243,15 @@ class Sync_Data_Store {
 	 * @throws Sync_Data_Lock_Exception When the lock cannot be acquired.
 	 */
 	private function set_option_lock( string $lock_key, bool $state ): void {
+		if ( $this->action_id <= 0 ) {
+			throw new Sync_Data_Lock_Exception(
+				esc_attr__( 'Fallback sync-data locks require an Action Scheduler action context.', 'as-processor' )
+			);
+		}
+
 		$delay           = 0.1;
 		$total_wait_time = 0;
-		$owner           = $this->get_lock_owner();
+		$owner           = (string) $this->action_id;
 
 		do {
 			try {
@@ -287,19 +292,6 @@ class Sync_Data_Store {
 				number_format( $total_wait_time, 2 )
 			)
 		);
-	}
-
-	/**
-	 * Return the owner value stored in fallback locks.
-	 *
-	 * @return string
-	 */
-	private function get_lock_owner(): string {
-		if ( $this->action_id > 0 ) {
-			return (string) $this->action_id;
-		}
-
-		return $this->owner_token;
 	}
 
 	/**
