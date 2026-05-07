@@ -54,6 +54,8 @@ final class Product_Import extends CSV {
 - [CSV imports](./import/csv/) for delimited text files.
 - [JSON imports](./import/json/) for large JSON files, including JSON Pointer support.
 - [Excel imports](./import/excel/) for `.xlsx` spreadsheets.
+- [API imports](./import/api/) for paginated remote sources.
+- [Sequential syncs](./sequential-sync/) for running several jobs in a fixed order.
 
 ## Chunk size
 

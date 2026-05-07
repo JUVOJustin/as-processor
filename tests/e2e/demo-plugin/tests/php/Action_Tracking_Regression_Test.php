@@ -285,7 +285,7 @@ class Action_Tracking_Test_Sequential_Sync extends Sequential_Sync {
 	}
 
 	public function get_current_job_name(): ?string {
-		$current_sync = $this->get_sync_data( 'current_sync' );
+		$current_sync = $this->get_shared_sync_data_store()->get( 'current_sync' );
 
 		if ( ! $current_sync instanceof Sync ) {
 			return null;

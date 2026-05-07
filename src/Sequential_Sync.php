@@ -21,8 +21,6 @@ use SplQueue;
 abstract class Sequential_Sync extends Sync implements Syncable {
 
 
-	use Sync_Data;
-
 	/**
 	 * Stores all the sync tasks in a queue
 	 *
@@ -76,15 +74,14 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 	private ?Sync $current_sync = null;
 
 	/**
-	 * Constructor method to initialize synchronization data name
-	 * and register hooks for processing the synchronization sequence.
+	 * Constructor method to initialize shared sequence data and hooks.
 	 *
 	 * @return void
 	 */
 	public function __construct() {
 		parent::__construct();
 
-		$this->set_sync_data_name( $this->get_sync_name() );
+		$this->set_shared_sync_data_name( $this->get_sync_name() );
 
 		// Run always on initialisation
 		add_action(
@@ -116,11 +113,14 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 	/**
 	 * Prepare a child job for execution inside this sequence.
 	 *
+	 * The child keeps its own run-scoped store for lifecycle state. Only shared
+	 * handoff data points at the sequence store.
+	 *
 	 * @param Sync $job Child sync job.
 	 * @return void
 	 */
 	private function prepare_job( Sync $job ): void {
-		$job->set_sync_data_name( $this->get_sync_name() );
+		$job->set_shared_sync_data_name( $this->get_shared_sync_data_store()->get_name() );
 
 		if ( false === has_action( $job->get_sync_name() . '/finish', array( $job, 'on_finish' ) ) ) {
 			add_action( $job->get_sync_name() . '/finish', array( $job, 'on_finish' ) );
@@ -139,8 +139,8 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 	 */
 	private function retrieve_data(): void {
 
-		$queue        = $this->get_sync_data( 'queue' );
-		$current_sync = $this->get_sync_data( 'current_sync' );
+		$queue        = $this->get_shared_sync_data_store()->get( 'queue' );
+		$current_sync = $this->get_shared_sync_data_store()->get( 'current_sync' );
 
 		if ( empty( $queue ) ) {
 			$this->queue = new SplQueue();
@@ -170,8 +170,8 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 
 				// Reset data
 				$this->current_sync = null;
-				$this->update_sync_data( 'queue', $this->queue );
-				$this->update_sync_data( 'current_sync', null );
+				$this->get_shared_sync_data_store()->update( 'queue', $this->queue );
+				$this->get_shared_sync_data_store()->update( 'current_sync', null );
 
 				// Allow working on data after sync is complete
 				do_action( $this->get_sync_name() . '/complete' );
@@ -183,8 +183,8 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 		$this->current_sync = $sync;
 
 		// Save current queue back to db
-		$this->update_sync_data( 'queue', $this->queue );
-		$this->update_sync_data( 'current_sync', $this->current_sync );
+		$this->get_shared_sync_data_store()->update( 'queue', $this->queue );
+		$this->get_shared_sync_data_store()->update( 'current_sync', $this->current_sync );
 
 		// Enqueue the current job as a real Action Scheduler action so lifecycle
 		// hooks (start, complete, finish) fire correctly for Import-style jobs.
@@ -238,7 +238,7 @@ abstract class Sequential_Sync extends Sync implements Syncable {
 
 		$this->queue->enqueue( $task );
 
-		$this->update_sync_data( 'queue', $this->queue );
+		$this->get_shared_sync_data_store()->update( 'queue', $this->queue );
 
 		return true;
 	}

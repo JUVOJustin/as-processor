@@ -7,8 +7,10 @@
 
 namespace AS_Processor_Demo\Tests\Integration;
 
+use ActionScheduler_Store;
 use AS_Processor_Demo\Product_API_Import;
 use AS_Processor_Demo\Tests\Support\E2E_Test_Case;
+use juvo\AS_Processor\DB\Chunk_DB;
 use WP_REST_Request;
 
 /**
@@ -34,20 +36,53 @@ class API_Import_Test extends E2E_Test_Case {
 			$root_action_id
 		);
 
-		// After the first fetch completes there should be at least one follow-up
-		// fetch queued and one chunk scheduled from the initial page.
-		$this->assertGreaterThanOrEqual(
-			1,
-			count( $this->get_action_ids( Product_API_Import::SYNC_NAME, 'pending', $group ) )
+		// The first API action should use its request budget to fetch all four
+		// mock pages and leave only chunk processors queued.
+		$this->assertCount(
+			0,
+			$this->get_action_ids( Product_API_Import::SYNC_NAME, 'pending', $group )
 		);
-		$this->assertGreaterThanOrEqual(
-			1,
-			count( $this->get_action_ids( Product_API_Import::SYNC_NAME . '/process_chunk', 'pending', $group ) )
+		$this->assertCount(
+			7,
+			$this->get_action_ids( Product_API_Import::SYNC_NAME . '/process_chunk', 'pending', $group )
 		);
 
 		$this->run_sync_to_completion( Product_API_Import::SYNC_NAME, $group );
 		$this->assert_sync_finished( $group );
+		$this->assertSame( 7, Chunk_DB::db()->get_total_actions( $group ) );
 		$this->assertSame( 35, $this->get_post_count( 'asp_api_item' ) );
+	}
+
+	public function test_api_import_schedules_continuation_when_batch_limit_is_reached(): void {
+		$batch_limit_filter = static fn (): int => 2;
+
+		add_filter( 'asp/api/max_fetches_per_request', $batch_limit_filter );
+
+		try {
+			$root_action_id = $this->schedule_import( Product_API_Import::SYNC_NAME );
+			$group          = $this->run_root_action_and_get_group(
+				Product_API_Import::SYNC_NAME,
+				$root_action_id
+			);
+
+			$fetch_action_ids = $this->get_action_ids( Product_API_Import::SYNC_NAME, 'pending', $group );
+			$this->assertCount( 1, $fetch_action_ids );
+
+			$fetch_action = ActionScheduler_Store::instance()->fetch_action( (string) $fetch_action_ids[0] );
+			$this->assertSame( 3, $fetch_action->get_args()['index'] );
+
+			$this->assertCount(
+				4,
+				$this->get_action_ids( Product_API_Import::SYNC_NAME . '/process_chunk', 'pending', $group )
+			);
+
+			$this->run_sync_to_completion( Product_API_Import::SYNC_NAME, $group );
+			$this->assert_sync_finished( $group );
+			$this->assertSame( 7, Chunk_DB::db()->get_total_actions( $group ) );
+			$this->assertSame( 35, $this->get_post_count( 'asp_api_item' ) );
+		} finally {
+			remove_filter( 'asp/api/max_fetches_per_request', $batch_limit_filter );
+		}
 	}
 
 	public function test_api_import_persists_unique_items_with_serialized_payloads(): void {

@@ -55,33 +55,66 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  */
 abstract class Sync implements Syncable {
 
-	use Sync_Data;
 	use Chunker;
 
 	/**
-	 * Name of the group the sync belongs to
+	 * Current Action Scheduler group for this sync run.
 	 *
-	 * @var string
+	 * A group is Action Scheduler's string namespace for related actions. AS
+	 * Processor uses one group per sync run so root/fetch actions, chunk
+	 * actions, chunk database rows, and run-scoped sync data can be queried and
+	 * finished together.
+	 *
+	 * This starts empty and is created lazily when the sync first needs to
+	 * schedule or query grouped work. When Action Scheduler later executes an
+	 * action that already has a group, handle_start() or should_trigger_finish()
+	 * replaces this value with the group stored on that action.
+	 *
+	 * @var string|null
 	 */
-	private string $sync_group_name;
+	private ?string $sync_group_name = null;
 
 	/**
-	 * ID of the action scheduler action in scope.
+	 * Action Scheduler action ID currently being handled by this sync instance.
+	 *
+	 * This is execution context, not sync identity. It is set from Action
+	 * Scheduler lifecycle hooks and passed to Sync_Data_Store so fallback
+	 * transient-style locks can mark the current action as their owner when
+	 * database locks are unavailable.
 	 *
 	 * @var int
 	 */
-	protected int $action_id;
+	protected int $action_id = 0;
 
 	/**
-	 * Initializes the class instance.
+	 * Store for lifecycle state scoped to the current sync run.
 	 *
-	 * Calls the necessary hooks and sets up the environment required for the instance.
+	 * Its namespace follows the current group name for regular syncs. It holds
+	 * internal state such as spawning action timestamps, pending API items, and
+	 * finish tracking. This data must stay isolated per run so concurrent runs
+	 * of the same sync name do not share lifecycle state.
+	 *
+	 * @var Sync_Data_Store|null
+	 */
+	private ?Sync_Data_Store $run_sync_data_store = null;
+
+	/**
+	 * Optional shared store for related sync jobs.
+	 *
+	 * Regular syncs leave this null and use the run store. Sequential syncs set
+	 * it to the sequence-level namespace so child jobs can intentionally share
+	 * handoff data while keeping their own run-scoped lifecycle state separate.
+	 *
+	 * @var Sync_Data_Store|null
+	 */
+	private ?Sync_Data_Store $shared_sync_data_store = null;
+
+	/**
+	 * Initializes the class instance and registers its Action Scheduler hooks.
 	 *
 	 * @return void
 	 */
 	public function __construct() {
-		$this->sync_group_name = $this->generate_sync_group_name();
-		$this->set_sync_data_name( $this->sync_group_name );
 		$this->set_hooks();
 	}
 
@@ -123,41 +156,146 @@ abstract class Sync implements Syncable {
 	abstract protected function process_chunk( int $chunk_id ): void;
 
 	/**
-	 * Returns the sync group name. If none is set, it generates one from the sync name and a UUID.
+	 * Return the current Action Scheduler group for this sync run.
+	 *
+	 * The group name is Action Scheduler's run identifier for related actions.
+	 * It is used for Action Scheduler queries, chunk tracking, and run-scoped
+	 * sync data. Action Scheduler lifecycle callbacks replace it with the
+	 * action's stored group when one exists. If no grouped action has provided
+	 * one yet, this method creates a new group name.
 	 *
 	 * @return string
 	 */
 	public function get_sync_group_name(): string {
+		if ( null === $this->sync_group_name ) {
+			$this->set_sync_group_name(
+				sprintf(
+					'%s_%s',
+					$this->get_sync_name(),
+					str_replace( '-', '', wp_generate_uuid4() )
+				)
+			);
+		}
+
 		return $this->sync_group_name;
 	}
 
 	/**
-	 * Generate a unique Action Scheduler group name for this sync instance.
-	 *
-	 * @return string
-	 */
-	private function generate_sync_group_name(): string {
-		return sprintf(
-			'%s_%s',
-			$this->get_sync_name(),
-			str_replace( '-', '', wp_generate_uuid4() )
-		);
-	}
-
-	/**
-	 * Set the current Action Scheduler group and keep the default sync-data namespace aligned.
+	 * Set the current Action Scheduler group and keep run data aligned.
 	 *
 	 * @param string $sync_group_name Action Scheduler group name.
 	 * @return void
 	 */
 	private function set_sync_group_name( string $sync_group_name ): void {
-		$sync_data_follows_group = $this->get_sync_data_name() === $this->sync_group_name;
+		$previous_group         = $this->sync_group_name;
+		$run_data_follows_group = (
+			$this->run_sync_data_store instanceof Sync_Data_Store
+			&& null !== $previous_group
+			&& $this->run_sync_data_store->get_name() === $previous_group
+		);
 
 		$this->sync_group_name = $sync_group_name;
 
-		if ( $sync_data_follows_group ) {
-			$this->set_sync_data_name( $sync_group_name );
+		if ( $run_data_follows_group ) {
+			$this->set_run_sync_data_name( $sync_group_name );
 		}
+	}
+
+	/**
+	 * Initialize the run-scoped data store.
+	 *
+	 * @param string $sync_data_name Run data namespace.
+	 * @return void
+	 */
+	private function initialize_sync_data_store( string $sync_data_name ): void {
+		$this->run_sync_data_store = new Sync_Data_Store( $sync_data_name );
+		$this->refresh_sync_data_store_action_id();
+	}
+
+	/**
+	 * Set the shared sync-data namespace.
+	 *
+	 * @param string $sync_data_name Shared data namespace.
+	 * @return void
+	 */
+	public function set_shared_sync_data_name( string $sync_data_name ): void {
+		$this->shared_sync_data_store = new Sync_Data_Store( $sync_data_name );
+		$this->refresh_sync_data_store_action_id();
+	}
+
+	/**
+	 * Return the run-scoped data store.
+	 *
+	 * @return Sync_Data_Store
+	 */
+	protected function get_run_sync_data_store(): Sync_Data_Store {
+		if ( ! $this->run_sync_data_store instanceof Sync_Data_Store ) {
+			$this->initialize_sync_data_store( $this->get_sync_group_name() );
+		}
+
+		return $this->run_sync_data_store;
+	}
+
+	/**
+	 * Return the shared data store, falling back to the run store.
+	 *
+	 * @return Sync_Data_Store
+	 */
+	protected function get_shared_sync_data_store(): Sync_Data_Store {
+		if ( $this->shared_sync_data_store instanceof Sync_Data_Store ) {
+			return $this->shared_sync_data_store;
+		}
+
+		return $this->get_run_sync_data_store();
+	}
+
+	/**
+	 * Change the run-scoped data namespace.
+	 *
+	 * @param string $sync_data_name Run data namespace.
+	 * @return void
+	 */
+	protected function set_run_sync_data_name( string $sync_data_name ): void {
+		$this->get_run_sync_data_store()->set_name( $sync_data_name );
+	}
+
+	/**
+	 * Keep store lock ownership aligned with the current action ID.
+	 *
+	 * @return void
+	 */
+	private function refresh_sync_data_store_action_id(): void {
+		if ( $this->run_sync_data_store instanceof Sync_Data_Store ) {
+			$this->run_sync_data_store->set_action_id( $this->action_id );
+		}
+
+		if ( $this->shared_sync_data_store instanceof Sync_Data_Store ) {
+			$this->shared_sync_data_store->set_action_id( $this->action_id );
+		}
+	}
+
+	/**
+	 * Normalize a lock key to ensure it does not exceed MySQL's lock-name limit.
+	 *
+	 * @param string $lock_key The lock key to normalize.
+	 * @return string
+	 */
+	protected function normalize_lock_key( string $lock_key ): string {
+		return Sync_Data_Store::normalize_lock_key( $lock_key );
+	}
+
+	/**
+	 * Set a lock state in the shared data store.
+	 *
+	 * Kept for existing subclasses. Internal lifecycle code should lock the
+	 * run-scoped store directly.
+	 *
+	 * @param string $key Key without namespace prefix.
+	 * @param bool   $state Whether to acquire or release the lock.
+	 * @return void
+	 */
+	protected function set_key_lock( string $key, bool $state ): void {
+		$this->get_shared_sync_data_store()->set_key_lock( $key, $state );
 	}
 
 	/**
@@ -292,6 +430,7 @@ abstract class Sync implements Syncable {
 		}
 
 		$this->action_id = $action_id;
+		$this->refresh_sync_data_store_action_id();
 
 		return $action;
 	}
@@ -447,12 +586,12 @@ abstract class Sync implements Syncable {
 
 		wp_trigger_error(
 			$function_name,
-			sprintf(
-				'[action_id: %d] [group: %s] %s',
-				$this->action_id,
-				$this->sync_group_name,
-				$message
-			),
+				sprintf(
+					'[action_id: %d] [group: %s] %s',
+					$this->action_id,
+					$this->get_sync_group_name(),
+					$message
+				),
 			$log_level
 		);
 	}
@@ -494,34 +633,7 @@ abstract class Sync implements Syncable {
 	 * @throws Exception When sync data update or retrieval fails.
 	 */
 	protected function mark_finish_ready(): bool {
-		$finish_key = $this->get_finish_tracking_key();
-
-		$this->set_key_lock( $finish_key, true );
-
-		try {
-			if ( $this->get_sync_data( $finish_key ) ) {
-				return false;
-			}
-
-			$this->update_sync_data( $finish_key, time() );
-		} finally {
-			$this->set_key_lock( $finish_key, false );
-		}
-
-		return true;
-	}
-
-	/**
-	 * Return the sync-data key used to track whether finish has fired.
-	 *
-	 * @return string
-	 */
-	private function get_finish_tracking_key(): string {
-		if ( $this->get_sync_data_name() === $this->get_sync_group_name() ) {
-			return 'finish_fired_at';
-		}
-
-		return $this->get_sync_group_name() . '_finish_fired_at';
+		return $this->get_run_sync_data_store()->add_once( 'finish_fired_at', time() );
 	}
 
 	/**

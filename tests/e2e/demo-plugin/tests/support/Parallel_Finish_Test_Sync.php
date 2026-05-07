@@ -45,7 +45,7 @@ class Parallel_Finish_Test_Sync extends Sync {
 
 	protected function process_chunk_data( Generator $chunk_data ): void {
 		foreach ( $chunk_data as $row ) {
-			$this->update_sync_data(
+			$this->get_shared_sync_data_store()->update(
 				self::WRITES_KEY,
 				array( (string) ( $row['label'] ?? '' ) ),
 				false,
@@ -59,7 +59,7 @@ class Parallel_Finish_Test_Sync extends Sync {
 	}
 
 	protected function mark_finish_ready(): bool {
-		$this->update_sync_data(
+		$this->get_shared_sync_data_store()->update(
 			self::FINISH_ATTEMPTS_KEY,
 			array( $this->action_id ),
 			false,
@@ -70,7 +70,7 @@ class Parallel_Finish_Test_Sync extends Sync {
 	}
 
 	public function on_finish(): void {
-		$this->update_sync_data(
+		$this->get_shared_sync_data_store()->update(
 			self::FINISH_GROUPS_KEY,
 			array( $this->get_sync_group_name() ),
 			false,
@@ -84,7 +84,7 @@ class Parallel_Finish_Test_Sync extends Sync {
 	 * @return string[]
 	 */
 	public function get_parallel_writes(): array {
-		return array_values( (array) ( $this->get_sync_data( self::WRITES_KEY ) ?: array() ) );
+		return array_values( (array) ( $this->get_shared_sync_data_store()->get( self::WRITES_KEY ) ?: array() ) );
 	}
 
 	/**
@@ -95,7 +95,7 @@ class Parallel_Finish_Test_Sync extends Sync {
 	public function get_finish_attempts(): array {
 		return array_map(
 			'intval',
-			array_values( (array) ( $this->get_sync_data( self::FINISH_ATTEMPTS_KEY ) ?: array() ) )
+			array_values( (array) ( $this->get_shared_sync_data_store()->get( self::FINISH_ATTEMPTS_KEY ) ?: array() ) )
 		);
 	}
 
@@ -105,6 +105,6 @@ class Parallel_Finish_Test_Sync extends Sync {
 	 * @return string[]
 	 */
 	public function get_finish_groups(): array {
-		return array_values( (array) ( $this->get_sync_data( self::FINISH_GROUPS_KEY ) ?: array() ) );
+		return array_values( (array) ( $this->get_shared_sync_data_store()->get( self::FINISH_GROUPS_KEY ) ?: array() ) );
 	}
 }
