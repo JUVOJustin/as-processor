@@ -24,13 +24,13 @@ class Sequential_Lead_JSON_Import extends Lead_JSON_Import {
 	public function track_scheduling_action( \ActionScheduler_Action $action ): void {
 		parent::track_scheduling_action( $action );
 
-		if ( $this->get_sync_data( self::OBSERVED_AT_START_KEY ) ) {
+		if ( $this->get_shared_sync_data_store()->get( self::OBSERVED_AT_START_KEY ) ) {
 			return;
 		}
 
-		$csv_product_count = (int) $this->get_sync_data( Sequential_Product_CSV_Import::PRODUCT_COUNT_KEY );
+		$csv_product_count = (int) $this->get_shared_sync_data_store()->get( Sequential_Product_CSV_Import::PRODUCT_COUNT_KEY );
 
-		$this->update_sync_data( self::OBSERVED_PRODUCT_COUNT_KEY, $csv_product_count );
-		$this->update_sync_data( self::OBSERVED_AT_START_KEY, true );
+		$this->get_shared_sync_data_store()->update( self::OBSERVED_PRODUCT_COUNT_KEY, $csv_product_count );
+		$this->get_shared_sync_data_store()->update( self::OBSERVED_AT_START_KEY, true );
 	}
 }

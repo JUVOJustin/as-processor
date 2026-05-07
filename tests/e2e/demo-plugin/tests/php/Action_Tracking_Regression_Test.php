@@ -9,6 +9,7 @@ namespace AS_Processor_Demo\Tests\Integration;
 
 use AS_Processor_Demo\Tests\Support\Action_Scheduler_Test_Helper;
 use AS_Processor_Demo\Tests\Support\E2E_Test_Case;
+use AS_Processor_Demo\Tests\Support\Parallel_Finish_Test_Sync;
 use Exception;
 use Generator;
 use juvo\AS_Processor\Entities\Chunk;
@@ -114,6 +115,44 @@ class Action_Tracking_Regression_Test extends E2E_Test_Case {
 		do_action( $first_job->get_sync_name() . '/finish', 'test_group' );
 
 		$this->assertSame( $second_job->get_sync_name(), $sequence->get_current_job_name(), 'Sequential sync should advance once the current job finishes.' );
+	}
+
+	public function test_parallel_workers_guard_finish_and_sync_data_writes(): void {
+		$sync = new Parallel_Finish_Test_Sync();
+		$sync->schedule();
+
+		$group = $sync->get_sync_group_name();
+		$action_ids = Action_Scheduler_Test_Helper::get_pending_action_ids(
+			Parallel_Finish_Test_Sync::SYNC_NAME . '/process_chunk',
+			$group
+		);
+
+		$this->assertCount( 2, $action_ids, 'The test sync should schedule two chunks.' );
+
+		$processed = Action_Scheduler_Test_Helper::run_actions_in_parallel( $action_ids );
+
+		$this->assertSame( 2, $processed, 'Both queued chunks should be processed.' );
+		$this->assertGreaterThanOrEqual(
+			2,
+			Action_Scheduler_Test_Helper::get_last_parallel_active_worker_count(),
+			'Expected more than one parallel Action Scheduler worker to process actions.'
+		);
+		$parallel_writes = $sync->get_parallel_writes();
+		sort( $parallel_writes );
+
+		$this->assertSame( array( 'first', 'second' ), $parallel_writes, 'Concurrent sync-data writes should preserve both worker updates.' );
+		$this->assertCount(
+			2,
+			array_unique( $sync->get_finish_attempts() ),
+			'Both workers should attempt to mark the sync as finished.'
+		);
+		$this->assertSame(
+			array( $group ),
+			$sync->get_finish_groups(),
+			'The finish hook should still fire exactly once for the group.'
+		);
+
+		$this->assert_sync_finished( $group );
 	}
 
 	/**
@@ -246,7 +285,7 @@ class Action_Tracking_Test_Sequential_Sync extends Sequential_Sync {
 	}
 
 	public function get_current_job_name(): ?string {
-		$current_sync = $this->get_sync_data( 'current_sync' );
+		$current_sync = $this->get_shared_sync_data_store()->get( 'current_sync' );
 
 		if ( ! $current_sync instanceof Sync ) {
 			return null;

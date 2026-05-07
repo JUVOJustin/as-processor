@@ -11,7 +11,6 @@
 
 namespace juvo\AS_Processor;
 
-use ActionScheduler_Store;
 use Exception;
 use juvo\AS_Processor\DB\Chunk_DB;
 
@@ -85,7 +84,7 @@ abstract class Import extends Sync {
 	public function track_scheduling_action( \ActionScheduler_Action $action ): void {
 
 		if ( empty( $action->get_group() ) ) {
-			$this->update_sync_data( 'spawning_action_started_at', time() );
+			$this->get_run_sync_data_store()->update( 'spawning_action_started_at', time() );
 		}
 	}
 
@@ -99,7 +98,7 @@ abstract class Import extends Sync {
 	public function on_complete( \ActionScheduler_Action $action ): void {
 
 		if ( empty( $action->get_group() ) ) {
-			$this->update_sync_data( 'spawning_action_ended_at', time() );
+			$this->get_run_sync_data_store()->update( 'spawning_action_ended_at', time() );
 		}
 	}
 
@@ -119,8 +118,8 @@ abstract class Import extends Sync {
 
 		return (
 			$completed
-			&& $this->get_sync_data( 'spawning_action_started_at' )
-			&& $this->get_sync_data( 'spawning_action_ended_at' )
+			&& $this->get_run_sync_data_store()->get( 'spawning_action_started_at' )
+			&& $this->get_run_sync_data_store()->get( 'spawning_action_ended_at' )
 		);
 	}
 }

@@ -21,6 +21,6 @@ class Sequential_Product_CSV_Import extends Product_CSV_Import {
 	}
 
 	public function on_finish(): void {
-		$this->update_sync_data( self::PRODUCT_COUNT_KEY, (int) ( wp_count_posts( 'asp_product' )->publish ?? 0 ) );
+		$this->get_shared_sync_data_store()->update( self::PRODUCT_COUNT_KEY, (int) ( wp_count_posts( 'asp_product' )->publish ?? 0 ) );
 	}
 }
