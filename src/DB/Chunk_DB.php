@@ -48,16 +48,48 @@ class Chunk_DB extends Base_DB {
             `end` decimal(14,4) DEFAULT NULL,
             `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
-            KEY `status` (`status`),
-            KEY `start` (`start`),
-            KEY `end` (`end`),
             KEY `action_id` (`action_id`),
-            KEY `group_name` (`group`),
-            KEY `group_status` (`group`, `status`)
+            KEY `group_status` (`group`, `status`),
+            KEY `group_start` (`group`, `start`),
+            KEY `group_end` (`group`, `end`)
         ) {$charset_collate}";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+
+		$this->drop_obsolete_indexes();
+	}
+
+	/**
+	 * Drops indexes that no query targets, so they do not slow down writes.
+	 *
+	 * Every read against this table is group-led, so the group-prefixed compound
+	 * indexes (`group_status`, `group_start`, `group_end`) cover all real query
+	 * shapes. The single-column `status`, `start` and `end` indexes — and the
+	 * short-lived `group_name` index, which is a redundant leftmost prefix of the
+	 * compound indexes — are therefore obsolete. `dbDelta()` only ever adds or
+	 * modifies indexes and never removes them, so they must be dropped explicitly
+	 * for existing installations. The lookup against `information_schema` keeps
+	 * this idempotent and avoids errors on installs where they are already gone.
+	 *
+	 * @return void
+	 */
+	private function drop_obsolete_indexes(): void {
+		$table_name = $this->get_table_name();
+
+		$existing_indexes = $this->db->get_col(
+			$this->db->prepare(
+				'SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s',
+				$table_name
+			)
+		);
+
+		$obsolete_indexes = array( 'status', 'start', 'end', 'group_name' );
+
+		foreach ( array_intersect( $obsolete_indexes, $existing_indexes ) as $index_name ) {
+			// $table_name and $index_name are both from trusted sources (table prefix and a fixed whitelist), so they are safe to interpolate; identifiers cannot be bound via prepare().
+			$this->db->query( "ALTER TABLE `{$table_name}` DROP INDEX `{$index_name}`" );
+		}
 	}
 
 	/**
