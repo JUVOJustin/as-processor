@@ -51,7 +51,9 @@ class Chunk_DB extends Base_DB {
             KEY `status` (`status`),
             KEY `start` (`start`),
             KEY `end` (`end`),
-            KEY `action_id` (`action_id`)
+            KEY `action_id` (`action_id`),
+            KEY `group_name` (`group`),
+            KEY `group_status` (`group`, `status`)
         ) {$charset_collate}";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
