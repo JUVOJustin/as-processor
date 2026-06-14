@@ -78,8 +78,8 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	protected function cleanup_tracking_tables(): void {
 		global $wpdb;
 
-		Chunk_DB::db()->ensure_table();
-		Data_DB::db()->ensure_table();
+		Chunk_DB::db()->create_table();
+		Data_DB::db()->create_table();
 
 		$wpdb->query( 'DELETE FROM ' . Chunk_DB::db()->get_table_name() );
 		$wpdb->query( 'DELETE FROM ' . Data_DB::db()->get_table_name() );

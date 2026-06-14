@@ -89,13 +89,30 @@ abstract class Base_DB {
 	/**
 	 * Ensure the table exists.
 	 *
+	 * Runs the schema check at most once per instance; subsequent calls are a
+	 * no-op. Use create_table() to force a re-check (e.g. test harnesses that
+	 * reset the database between cases).
+	 *
 	 * @return void
 	 */
 	public function ensure_table(): void {
 		if ( ! $this->table_checked ) {
-			$this->maybe_create_table();
-			$this->table_checked = true;
+			$this->create_table();
 		}
+	}
+
+	/**
+	 * Force the schema check, bypassing the per-instance cache.
+	 *
+	 * dbDelta is idempotent (create-if-not-exists), so this is safe to call
+	 * repeatedly. Intended for test harnesses that drop the tracking tables
+	 * between cases; production code should use ensure_table().
+	 *
+	 * @return void
+	 */
+	public function create_table(): void {
+		$this->maybe_create_table();
+		$this->table_checked = true;
 	}
 
 	/**
