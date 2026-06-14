@@ -586,12 +586,12 @@ abstract class Sync implements Syncable {
 
 		wp_trigger_error(
 			$function_name,
-				sprintf(
-					'[action_id: %d] [group: %s] %s',
-					$this->action_id,
-					$this->get_sync_group_name(),
-					$message
-				),
+			sprintf(
+				'[action_id: %d] [group: %s] %s',
+				$this->action_id,
+				$this->get_sync_group_name(),
+				$message
+			),
 			$log_level
 		);
 	}
