@@ -104,9 +104,9 @@ abstract class Base_DB {
 	/**
 	 * Force the schema check, bypassing the per-instance cache.
 	 *
-	 * dbDelta is idempotent (create-if-not-exists), so this is safe to call
-	 * repeatedly. Intended for test harnesses that drop the tracking tables
-	 * between cases; production code should use ensure_table().
+	 * The underlying dbDelta call is idempotent (create-if-not-exists), so this
+	 * is safe to call repeatedly. Intended for test harnesses that drop the
+	 * tracking tables between cases; production code should use ensure_table().
 	 *
 	 * @return void
 	 */
