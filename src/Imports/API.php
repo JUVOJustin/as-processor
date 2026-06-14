@@ -50,7 +50,7 @@ abstract class API extends Import
     {
 
         // Maybe set current index. Default value can be set with class parameter in child implementation
-        if ($index != null) {
+        if ($index !== null) {
             $this->index = $index;
         }
 
@@ -101,7 +101,9 @@ abstract class API extends Import
 
         // If this was the last request schedule chunk as well. Else schedule request
         if ($this->next === false) {
-            $this->schedule_chunk($items);
+            if (!empty($items)) {
+                $this->schedule_chunk($items);
+            }
         } else {
             if ($this->time_between_requests >= 15) {
                 // Longer request intervals (> 15 sec) are scheduled since they would unnecessarily keep php requests alive

@@ -47,8 +47,8 @@ class Stats
             'total_actions'           => Chunk_DB::db()->get_total_actions($this->group_name),
             'sync_duration'           => Chunk_DB::db()->get_sync_duration($this->group_name),
             'average_action_duration' => Chunk_DB::db()->get_average_action_duration($this->group_name),
-            'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name)->setJsonExcludedFields($excludedFields),
-            'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name)->setJsonExcludedFields($excludedFields),
+            'slowest_action'          => Chunk_DB::db()->get_slowest_action($this->group_name)?->setJsonExcludedFields($excludedFields),
+            'fastest_action'          => Chunk_DB::db()->get_fastest_action($this->group_name)?->setJsonExcludedFields($excludedFields),
             'actions'                 => $actions,
             'custom_data'             => $custom_data
         ];
@@ -88,8 +88,8 @@ class Stats
             foreach ($failed_actions as $chunk) {
                 $email_text .= sprintf(__("Action ID: %s", 'as-processor'), $chunk->get_action_id()) . "\n";
                 $email_text .= sprintf(__("Status: %s", 'as-processor'), $chunk->get_status()->value) . "\n";
-                $email_text .= sprintf(__("Start: %s", 'as-processor'), $chunk->get_start()->format("Y-m-d H:i:s.u T")) . "\n";
-                $email_text .= sprintf(__("End: %s", 'as-processor'), $chunk->get_end()->format("Y-m-d H:i:s.u T")) . "\n";
+                $email_text .= sprintf(__("Start: %s", 'as-processor'), $chunk->get_start()?->format("Y-m-d H:i:s.u T") ?? 'N/A') . "\n";
+                $email_text .= sprintf(__("End: %s", 'as-processor'), $chunk->get_end()?->format("Y-m-d H:i:s.u T") ?? 'N/A') . "\n";
 
 				if ($chunk->get_status()->value === 'failed') {
                     $email_text .= __("Log Messages:", 'as-processor') . "\n";
@@ -118,9 +118,9 @@ class Stats
 	{
 
 		$message = $this->prepare_email_text($custom_data);
-		$mailarray = apply_filters('asp/stats/remail_report', [
+		$mailarray = apply_filters('asp/stats/email_report', [
 			'to'      => $to ?: get_option('admin_email'),
-			'subject' => $subject ?: sprintf(__('[%s] Report of sync group %s', 'sinnewerk'), get_bloginfo('name'), $this->group_name),
+			'subject' => $subject ?: sprintf(__('[%s] Report of sync group %s', 'as-processor'), get_bloginfo('name'), $this->group_name),
 			'message' => $message
 		]);
 		wp_mail($mailarray['to'], $mailarray['subject'], $mailarray['message']);
