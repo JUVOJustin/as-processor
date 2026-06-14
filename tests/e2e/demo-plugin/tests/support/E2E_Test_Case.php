@@ -78,11 +78,27 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	protected function cleanup_tracking_tables(): void {
 		global $wpdb;
 
-		Chunk_DB::db()->ensure_table();
-		Data_DB::db()->ensure_table();
+		// The WP test framework resets the database between cases, but the DB
+		// singletons cache their "table exists" check for the life of the PHP
+		// process. Clear the cached instances so the next db() call rebuilds
+		// them and re-runs the (idempotent) schema check, recreating the tables.
+		$this->reset_db_singleton( Chunk_DB::class );
+		$this->reset_db_singleton( Data_DB::class );
 
 		$wpdb->query( 'DELETE FROM ' . Chunk_DB::db()->get_table_name() );
 		$wpdb->query( 'DELETE FROM ' . Data_DB::db()->get_table_name() );
+	}
+
+	/**
+	 * Clear a DB class's cached singleton so the next db() call rebuilds it.
+	 *
+	 * @param class-string<\juvo\AS_Processor\DB\Base_DB> $class Fully-qualified DB class name.
+	 * @return void
+	 */
+	private function reset_db_singleton( string $class ): void {
+		$property = new \ReflectionProperty( $class, 'instance' );
+		$property->setAccessible( true );
+		$property->setValue( null, null );
 	}
 
 	/**

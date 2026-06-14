@@ -21,6 +21,12 @@ use juvo\AS_Processor\Helper;
  */
 class Chunk_DB extends Base_DB {
 
+	/**
+	 * Singleton instance of the database class.
+	 *
+	 * @var ?Base_DB
+	 */
+	protected static ?Base_DB $instance = null;
 
 	/**
 	 * The name of the table.

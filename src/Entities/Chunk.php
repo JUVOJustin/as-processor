@@ -393,7 +393,7 @@ class Chunk implements JsonSerializable {
 
 		// Check for each value before calling the corresponding setter
 		if ( ! empty( $data['data'] ) ) {
-			$chunk->set_data( unserialize( $data['data'] ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
+			$chunk->set_data( unserialize( $data['data'], array( 'allowed_classes' => false ) ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize
 		}
 
 		if ( ! empty( $data['action_id'] ) ) {
