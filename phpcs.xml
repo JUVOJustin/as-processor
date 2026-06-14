@@ -21,6 +21,7 @@
     <exclude-pattern>node_modules/*</exclude-pattern>
     <exclude-pattern>bin/*</exclude-pattern>
     <exclude-pattern>dist/*</exclude-pattern>
+    <exclude-pattern>monorepo-builder.php</exclude-pattern>
 
     <!-- Include all files from the root of the project -->
     <file>.</file>
