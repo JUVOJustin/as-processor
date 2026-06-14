@@ -15,6 +15,7 @@ namespace juvo\AS_Processor\DB;
  */
 class Data_DB extends Base_DB {
 
+	protected static ?self $instance = null;
 
 	/**
 	 * The name of the table.
