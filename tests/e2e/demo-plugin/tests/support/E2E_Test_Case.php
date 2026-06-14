@@ -78,6 +78,12 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	protected function cleanup_tracking_tables(): void {
 		global $wpdb;
 
+		remove_filter( 'query', array( $this, '_create_temporary_tables' ) );
+		remove_filter( 'query', array( $this, '_drop_temporary_tables' ) );
+
+		$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . Chunk_DB::db()->get_table_name() );
+		$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . Data_DB::db()->get_table_name() );
+
 		Chunk_DB::db()->ensure_table();
 		Data_DB::db()->ensure_table();
 
@@ -89,9 +95,30 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	 * Remove any pending Action Scheduler actions for the demo imports.
 	 */
 	protected function cleanup_pending_actions(): void {
+		$store    = ActionScheduler_Store::instance();
+		$statuses = array(
+			ActionScheduler_Store::STATUS_PENDING,
+			ActionScheduler_Store::STATUS_RUNNING,
+			ActionScheduler_Store::STATUS_COMPLETE,
+			ActionScheduler_Store::STATUS_FAILED,
+			ActionScheduler_Store::STATUS_CANCELED,
+		);
+
 		foreach ( $this->sync_hooks() as $hook ) {
-			as_unschedule_all_actions( $hook );
-			as_unschedule_all_actions( $hook . '/process_chunk' );
+			foreach ( array( $hook, $hook . '/process_chunk' ) as $action_hook ) {
+				$action_ids = as_get_scheduled_actions(
+					array(
+						'hook'     => $action_hook,
+						'status'   => $statuses,
+						'per_page' => 1000,
+					),
+					'ids'
+				);
+
+				foreach ( $action_ids as $action_id ) {
+					$store->delete_action( (int) $action_id );
+				}
+			}
 		}
 	}
 
@@ -147,12 +174,15 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	 * @param string $group Sync group name (used to scope the queries).
 	 */
 	protected function run_sync_to_completion( string $hook, string $group ): void {
-		$processed = Action_Scheduler_Test_Helper::run_until_idle(
-			array( $hook, $hook . '/process_chunk' ),
+		$hooks = array( $hook, $hook . '/process_chunk' );
+
+		$processed = Action_Scheduler_Test_Helper::run_until_idle_parallel(
+			$hooks,
 			$group
 		);
 
 		$this->assertGreaterThan( 0, $processed, 'Expected scheduled actions to run.' );
+
 		$this->assertSame(
 			array(),
 			Action_Scheduler_Test_Helper::get_pending_action_ids( $hook, $group )
@@ -253,6 +283,7 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 			Combined_Sequential_Import::SYNC_NAME,
 			Sequential_Product_CSV_Import::SYNC_NAME,
 			Sequential_Lead_JSON_Import::SYNC_NAME,
+			Parallel_Finish_Test_Sync::SYNC_NAME,
 		);
 	}
 }

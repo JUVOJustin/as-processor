@@ -21,21 +21,32 @@ class Sequential_Sync_Test extends E2E_Test_Case {
 
 	public function test_sequential_sync_runs_jobs_in_order_through_real_queue(): void {
 		$csv_finish_calls = 0;
+		$json_finish_calls = 0;
 		$json_start_calls = 0;
+		$csv_finish_recorder = static function () use ( &$csv_finish_calls ): void {
+			++$csv_finish_calls;
+		};
+		$json_finish_recorder = static function () use ( &$json_finish_calls ): void {
+			++$json_finish_calls;
+		};
+		$json_start_recorder = function () use ( &$json_start_calls ): void {
+			++$json_start_calls;
+			$this->assertSame( 15, $this->get_post_count( 'asp_product' ), 'JSON sync must not start before the CSV sync fully finishes.' );
+		};
 
 		add_action(
 			Sequential_Product_CSV_Import::SYNC_NAME . '/finish',
-			static function () use ( &$csv_finish_calls ): void {
-				++$csv_finish_calls;
-			}
+			$csv_finish_recorder
+		);
+
+		add_action(
+			Sequential_Lead_JSON_Import::SYNC_NAME . '/finish',
+			$json_finish_recorder
 		);
 
 		add_action(
 			Sequential_Lead_JSON_Import::SYNC_NAME . '/start',
-			function () use ( &$json_start_calls ): void {
-				++$json_start_calls;
-				$this->assertSame( 15, $this->get_post_count( 'asp_product' ), 'JSON sync must not start before the CSV sync fully finishes.' );
-			},
+			$json_start_recorder,
 			10,
 			2
 		);
@@ -58,6 +69,7 @@ class Sequential_Sync_Test extends E2E_Test_Case {
 		$this->assertSame( 15, $this->get_post_count( 'asp_product' ) );
 		$this->assertSame( 12, $this->get_post_count( 'asp_lead' ) );
 		$this->assertSame( 1, $csv_finish_calls, 'CSV job should finish exactly once.' );
+		$this->assertSame( 1, $json_finish_calls, 'JSON job should finish exactly once.' );
 		$this->assertGreaterThanOrEqual( 1, $json_start_calls, 'JSON job should start after CSV completion.' );
 		$this->assertSame(
 			15,
@@ -70,8 +82,27 @@ class Sequential_Sync_Test extends E2E_Test_Case {
 			'The JSON job should observe the CSV-produced shared sync data through the sequential handoff.'
 		);
 
-		remove_all_actions( Sequential_Product_CSV_Import::SYNC_NAME . '/finish' );
-		remove_all_actions( Sequential_Lead_JSON_Import::SYNC_NAME . '/start' );
+		$csv_group  = $this->get_latest_chunk_group_for_sync( Sequential_Product_CSV_Import::SYNC_NAME );
+		$json_group = $this->get_latest_chunk_group_for_sync( Sequential_Lead_JSON_Import::SYNC_NAME );
+
+		$this->assertNotSame( '', $csv_group );
+		$this->assertNotSame( '', $json_group );
+		$this->assertNotFalse(
+			Data_DB::db()->get( $csv_group . '_finish_fired_at', 'data' ),
+			'CSV child finish tracking should stay in the child run store.'
+		);
+		$this->assertNotFalse(
+			Data_DB::db()->get( $json_group . '_finish_fired_at', 'data' ),
+			'JSON child finish tracking should stay in the child run store.'
+		);
+		$this->assertFalse(
+			Data_DB::db()->get( Combined_Sequential_Import::SYNC_NAME . '_' . $csv_group . '_finish_fired_at', 'data' ),
+			'Shared sequential data should not need group-prefixed finish tracking keys.'
+		);
+
+		remove_action( Sequential_Product_CSV_Import::SYNC_NAME . '/finish', $csv_finish_recorder );
+		remove_action( Sequential_Lead_JSON_Import::SYNC_NAME . '/finish', $json_finish_recorder );
+		remove_action( Sequential_Lead_JSON_Import::SYNC_NAME . '/start', $json_start_recorder );
 	}
 
 	public function test_sequential_sync_shares_sync_data_between_jobs(): void {

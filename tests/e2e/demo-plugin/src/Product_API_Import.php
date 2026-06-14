@@ -32,7 +32,7 @@ class Product_API_Import extends API {
 	 * index so repeated dispatches of the same import instance (e.g. during
 	 * integration tests) start from page 1 again.
 	 */
-	public function split_data_into_chunks( ?int $index = null ): void {
+	public function split_data_into_chunks( int|string|null $index = null ): void {
 		if ( null === $index ) {
 			$this->index = 1;
 			$this->next  = 0;

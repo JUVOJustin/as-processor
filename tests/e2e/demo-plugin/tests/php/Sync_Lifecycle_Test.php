@@ -9,6 +9,7 @@
 namespace AS_Processor_Demo\Tests\Integration;
 
 use AS_Processor_Demo\Product_CSV_Import;
+use AS_Processor_Demo\Tests\Support\Action_Scheduler_Test_Helper;
 use AS_Processor_Demo\Tests\Support\E2E_Test_Case;
 
 /**
@@ -53,11 +54,17 @@ class Sync_Lifecycle_Test extends E2E_Test_Case {
 		);
 		$this->run_sync_to_completion( Product_CSV_Import::SYNC_NAME, $group );
 
+		$worker_lifecycle = Action_Scheduler_Test_Helper::get_last_parallel_lifecycle_counts();
+
 		// 1 root action + 3 chunk actions = at least 4 start/complete firings.
-		$this->assertGreaterThanOrEqual( 4, $start_calls );
-		$this->assertGreaterThanOrEqual( 4, $complete_calls );
+		$this->assertGreaterThanOrEqual( 4, $start_calls + $worker_lifecycle['start'] );
+		$this->assertGreaterThanOrEqual( 4, $complete_calls + $worker_lifecycle['complete'] );
 		// /finish fires exactly once when the whole sync is done.
-		$this->assertSame( 1, $finish_calls );
+		$this->assertSame(
+			1,
+			$finish_calls + $worker_lifecycle['finish'],
+			sprintf( 'Worker lifecycle counts: %s', wp_json_encode( $worker_lifecycle ) )
+		);
 
 		remove_all_actions( Product_CSV_Import::SYNC_NAME . '/start' );
 		remove_all_actions( Product_CSV_Import::SYNC_NAME . '/complete' );

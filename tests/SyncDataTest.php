@@ -3,19 +3,17 @@
 namespace juvo\AS_Processor\Tests;
 
 use PHPUnit\Framework\TestCase;
-use juvo\AS_Processor\Sync_Data;
+use juvo\AS_Processor\Sync_Data_Store;
 
 class SyncDataTest extends TestCase
 {
-	use Sync_Data;
-
 	/**
 	 * Test that short lock keys are returned unchanged
 	 */
 	public function test_normalize_lock_key_short_name(): void
 	{
 		$short_key = 'test_sync_post_ids_lock';
-		$normalized = $this->normalize_lock_key($short_key);
+		$normalized = Sync_Data_Store::normalize_lock_key($short_key);
 		
 		$this->assertEquals($short_key, $normalized);
 		$this->assertLessThanOrEqual(64, strlen($normalized));
@@ -27,7 +25,7 @@ class SyncDataTest extends TestCase
 	public function test_normalize_lock_key_exactly_64_chars(): void
 	{
 		$key_64 = str_repeat('a', 64);
-		$normalized = $this->normalize_lock_key($key_64);
+		$normalized = Sync_Data_Store::normalize_lock_key($key_64);
 		
 		$this->assertEquals($key_64, $normalized);
 		$this->assertEquals(64, strlen($normalized));
@@ -39,7 +37,7 @@ class SyncDataTest extends TestCase
 	public function test_normalize_lock_key_long_name(): void
 	{
 		$long_key = 'autoscout_ch_switzerland_dealer_network/vehicles_import_post_ids_lock';
-		$normalized = $this->normalize_lock_key($long_key);
+		$normalized = Sync_Data_Store::normalize_lock_key($long_key);
 		
 		$this->assertNotEquals($long_key, $normalized);
 		$this->assertLessThanOrEqual(64, strlen($normalized));
@@ -53,8 +51,8 @@ class SyncDataTest extends TestCase
 	public function test_normalize_lock_key_consistent_hashing(): void
 	{
 		$long_key = 'very_long_sync_name_that_will_definitely_exceed_the_limit_with_underscores';
-		$normalized1 = $this->normalize_lock_key($long_key);
-		$normalized2 = $this->normalize_lock_key($long_key);
+		$normalized1 = Sync_Data_Store::normalize_lock_key($long_key);
+		$normalized2 = Sync_Data_Store::normalize_lock_key($long_key);
 		
 		$this->assertEquals($normalized1, $normalized2);
 	}
@@ -67,8 +65,8 @@ class SyncDataTest extends TestCase
 		$long_key1 = 'autoscout_ch_switzerland_dealer_network/vehicles_import_post_ids_lock';
 		$long_key2 = 'autoscout_de_germany_dealer_network/vehicles_import_post_ids_lock';
 		
-		$normalized1 = $this->normalize_lock_key($long_key1);
-		$normalized2 = $this->normalize_lock_key($long_key2);
+		$normalized1 = Sync_Data_Store::normalize_lock_key($long_key1);
+		$normalized2 = Sync_Data_Store::normalize_lock_key($long_key2);
 		
 		$this->assertNotEquals($normalized1, $normalized2);
 	}
@@ -79,7 +77,7 @@ class SyncDataTest extends TestCase
 	public function test_normalize_lock_key_65_chars(): void
 	{
 		$key_65 = str_repeat('a', 65);
-		$normalized = $this->normalize_lock_key($key_65);
+		$normalized = Sync_Data_Store::normalize_lock_key($key_65);
 		
 		$this->assertNotEquals($key_65, $normalized);
 		$this->assertLessThanOrEqual(64, strlen($normalized));
@@ -98,7 +96,7 @@ class SyncDataTest extends TestCase
 		];
 
 		foreach ($test_cases as $lock_key => $should_be_hashed) {
-			$normalized = $this->normalize_lock_key($lock_key);
+			$normalized = Sync_Data_Store::normalize_lock_key($lock_key);
 			
 			if ($should_be_hashed) {
 				$this->assertNotEquals($lock_key, $normalized, "Key '$lock_key' should be hashed");
