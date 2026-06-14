@@ -8,6 +8,14 @@ Install the package with Composer:
 composer require juvo/as-processor
 ```
 
+### Agent Skills
+
+This repository ships a `skills-lock.json` that pins the Agent skills used in development. After cloning, install them with:
+
+```bash
+npx skills update
+```
+
 The package ships with runtime support for Action Scheduler integrations plus CSV, Excel, JSON, and API-driven imports.
 
 Development and test assets stay in the repository, but they are excluded from package archives and production autoloading. Consumers only get the runtime library under `src/`.

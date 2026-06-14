@@ -21,6 +21,10 @@ yarn-error.log
 /tests/e2e/demo-plugin/tests/.phpunit.result.cache
 /tests/e2e/demo-plugin/data/products.xlsx
 
+# Claude Code / AI agent config
+/.agents/
+/.claude/
+
 # IDE / editor
 /.idea/
 /.vscode/
