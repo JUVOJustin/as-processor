@@ -13,13 +13,6 @@
 namespace AS_Processor_Demo\Tests\Support;
 
 use ActionScheduler_Store;
-use AS_Processor_Demo\Combined_Sequential_Import;
-use AS_Processor_Demo\Lead_JSON_Import;
-use AS_Processor_Demo\Product_API_Import;
-use AS_Processor_Demo\Product_CSV_Import;
-use AS_Processor_Demo\Product_Excel_Import;
-use AS_Processor_Demo\Sequential_Lead_JSON_Import;
-use AS_Processor_Demo\Sequential_Product_CSV_Import;
 use AS_Processor_Demo\Support\Demo_Fixture_Manager;
 use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\DB\Data_DB;
@@ -78,12 +71,26 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	protected function cleanup_tracking_tables(): void {
 		global $wpdb;
 
-		// The WP test framework resets the database between cases, but the DB
-		// singletons cache their "table exists" check for the life of the PHP
-		// process. Clear the cached instances so the next db() call rebuilds
-		// them and re-runs the (idempotent) schema check, recreating the tables.
+		// The parallel queue runners connect to the database from separate PHP
+		// processes, so the chunk- and sync-data tables must be real tables
+		// rather than the connection-local temporary tables WP_UnitTestCase
+		// creates by default. Stop the framework rewriting our CREATE TABLE into
+		// temporary ones and drop any temporary variants left from a prior case.
+		remove_filter( 'query', array( $this, '_create_temporary_tables' ) );
+		remove_filter( 'query', array( $this, '_drop_temporary_tables' ) );
+
+		$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . Chunk_DB::db()->get_table_name() );
+		$wpdb->query( 'DROP TEMPORARY TABLE IF EXISTS ' . Data_DB::db()->get_table_name() );
+
+		// The DB singletons cache their "table exists" check for the life of the
+		// PHP process. Clear the cached instances so the next db() call rebuilds
+		// them and re-runs the (idempotent) schema check, recreating the real
+		// tables.
 		$this->reset_db_singleton( Chunk_DB::class );
 		$this->reset_db_singleton( Data_DB::class );
+
+		Chunk_DB::db()->ensure_table();
+		Data_DB::db()->ensure_table();
 
 		$wpdb->query( 'DELETE FROM ' . Chunk_DB::db()->get_table_name() );
 		$wpdb->query( 'DELETE FROM ' . Data_DB::db()->get_table_name() );
@@ -102,12 +109,39 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Remove any pending Action Scheduler actions for the demo imports.
+	 * Remove Action Scheduler actions created by the demo plugin and its tests.
+	 *
+	 * Parallel runs commit the test transaction, so actions are no longer rolled
+	 * back automatically between tests. Delete every action whose hook belongs to
+	 * this plugin — across all sub-hooks (process_chunk, finish_check) and the
+	 * ad-hoc `asp_test_*` doubles — so one test's queue cannot leak into the next.
+	 * Action Scheduler's own internal actions (which do not carry the `asp_`
+	 * prefix) are left untouched.
 	 */
 	protected function cleanup_pending_actions(): void {
-		foreach ( $this->sync_hooks() as $hook ) {
-			as_unschedule_all_actions( $hook );
-			as_unschedule_all_actions( $hook . '/process_chunk' );
+		$store    = ActionScheduler_Store::instance();
+		$statuses = array(
+			ActionScheduler_Store::STATUS_PENDING,
+			ActionScheduler_Store::STATUS_RUNNING,
+			ActionScheduler_Store::STATUS_COMPLETE,
+			ActionScheduler_Store::STATUS_FAILED,
+			ActionScheduler_Store::STATUS_CANCELED,
+		);
+
+		$action_ids = as_get_scheduled_actions(
+			array(
+				'status'   => $statuses,
+				'per_page' => 1000,
+			),
+			'ids'
+		);
+
+		foreach ( $action_ids as $action_id ) {
+			$action = $store->fetch_action( (string) $action_id );
+
+			if ( str_starts_with( $action->get_hook(), 'asp_' ) ) {
+				$store->delete_action( (int) $action_id );
+			}
 		}
 	}
 
@@ -164,7 +198,7 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 	 */
 	protected function run_sync_to_completion( string $hook, string $group ): void {
 		$processed = Action_Scheduler_Test_Helper::run_until_idle(
-			array( $hook, $hook . '/process_chunk' ),
+			array( $hook, $hook . '/process_chunk', $hook . '/finish_check' ),
 			$group
 		);
 
@@ -176,6 +210,10 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 		$this->assertSame(
 			array(),
 			Action_Scheduler_Test_Helper::get_pending_action_ids( $hook . '/process_chunk', $group )
+		);
+		$this->assertSame(
+			array(),
+			Action_Scheduler_Test_Helper::get_pending_action_ids( $hook . '/finish_check', $group )
 		);
 	}
 
@@ -253,22 +291,5 @@ abstract class E2E_Test_Case extends WP_UnitTestCase {
 		}
 
 		return array_map( 'intval', as_get_scheduled_actions( $query, 'ids' ) );
-	}
-
-	/**
-	 * All root sync hooks the demo plugin exposes.
-	 *
-	 * @return string[]
-	 */
-	private function sync_hooks(): array {
-		return array(
-			Product_CSV_Import::SYNC_NAME,
-			Lead_JSON_Import::SYNC_NAME,
-			Product_Excel_Import::SYNC_NAME,
-			Product_API_Import::SYNC_NAME,
-			Combined_Sequential_Import::SYNC_NAME,
-			Sequential_Product_CSV_Import::SYNC_NAME,
-			Sequential_Lead_JSON_Import::SYNC_NAME,
-		);
 	}
 }
