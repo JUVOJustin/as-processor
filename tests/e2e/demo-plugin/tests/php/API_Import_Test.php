@@ -8,6 +8,7 @@
 namespace AS_Processor_Demo\Tests\Integration;
 
 use AS_Processor_Demo\Product_API_Import;
+use AS_Processor_Demo\Tests\Support\Action_Scheduler_Test_Helper;
 use AS_Processor_Demo\Tests\Support\E2E_Test_Case;
 use WP_REST_Request;
 
@@ -45,6 +46,32 @@ class API_Import_Test extends E2E_Test_Case {
 			count( $this->get_action_ids( Product_API_Import::SYNC_NAME . '/process_chunk', 'pending', $group ) )
 		);
 
+		$this->run_sync_to_completion( Product_API_Import::SYNC_NAME, $group );
+		$this->assert_sync_finished( $group );
+		$this->assertSame( 35, $this->get_post_count( 'asp_api_item' ) );
+	}
+
+	public function test_api_finish_check_is_not_scheduled_while_still_fetching(): void {
+		$root  = $this->schedule_import( Product_API_Import::SYNC_NAME );
+		$group = $this->run_root_action_and_get_group( Product_API_Import::SYNC_NAME, $root );
+
+		// After the first page a follow-up fetch is still queued and the
+		// spawning-ended marker is not set yet.
+		$fetch_ids = $this->get_action_ids( Product_API_Import::SYNC_NAME, 'pending', $group );
+		$this->assertNotEmpty( $fetch_ids, 'Expected a follow-up fetch while paginating.' );
+
+		// Completing a fetch mid-pagination must NOT schedule a finish-check —
+		// finish cannot fire until the last page is in, so spawning one per fetch
+		// wave would just add noise.
+		Action_Scheduler_Test_Helper::run_action( $fetch_ids[0] );
+
+		$this->assertCount(
+			0,
+			$this->get_action_ids( Product_API_Import::SYNC_NAME . '/finish_check', 'pending', $group ),
+			'No finish-check should be scheduled while the API import is still fetching.'
+		);
+
+		// The import still finishes correctly once it drains to completion.
 		$this->run_sync_to_completion( Product_API_Import::SYNC_NAME, $group );
 		$this->assert_sync_finished( $group );
 		$this->assertSame( 35, $this->get_post_count( 'asp_api_item' ) );

@@ -42,6 +42,24 @@ trait Finish_Tracking {
 	}
 
 	/**
+	 * Whether the run has produced all of its work, so a finish-check could
+	 * actually succeed.
+	 *
+	 * Defaults to true: most syncs schedule all of their work before any of it
+	 * runs, so a finish-check is always meaningful. Syncs that keep scheduling
+	 * work across several actions — for example a paginated API import that adds
+	 * chunks and follow-up fetches until the last page — override this so they do
+	 * not spawn a finish-check on every wave while finish provably cannot fire
+	 * yet. This must be monotonic: once it returns true it must keep returning
+	 * true, so the final, decisive finish-check is never suppressed.
+	 *
+	 * @return bool
+	 */
+	protected function finish_check_ready(): bool {
+		return true;
+	}
+
+	/**
 	 * Schedule the deferred finish-check action for the current run.
 	 *
 	 * Called from every work-action completion. At most one finish-check is kept
@@ -52,6 +70,13 @@ trait Finish_Tracking {
 	 * @return void
 	 */
 	protected function schedule_finish_check(): void {
+		// Skip while the run is still producing work (e.g. an API import mid
+		// pagination): a finish-check could not succeed yet, so scheduling one
+		// per completion wave would only add noise.
+		if ( ! $this->finish_check_ready() ) {
+			return;
+		}
+
 		$group = $this->get_sync_group_name();
 		$hook  = $this->get_finish_check_hook();
 
