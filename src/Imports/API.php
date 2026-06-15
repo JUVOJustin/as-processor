@@ -253,8 +253,21 @@ abstract class API extends Import
             return; // There are still pending or running fetch actions
         }
 
-        // Mark fetching as done. The finish hook is fired by Sync::handle_complete()
-        // once should_trigger_finish() confirms all chunks completed as well.
+        // Mark fetching as done. The finish hook is then fired by the deferred
+        // finish-check once all chunks have completed as well.
         $this->update_sync_data( 'spawning_action_ended_at', time() );
+    }
+
+    /**
+     * API imports keep scheduling work — chunks and follow-up fetches — until the
+     * last page has been fetched, so a finish-check cannot succeed before then.
+     * Gate finish-check scheduling on the spawning-ended marker so a paginated
+     * import does not spawn a finish-check on every fetch wave. The marker is set
+     * once (in on_complete) and never cleared, so this stays monotonic.
+     *
+     * @return bool
+     */
+    protected function finish_check_ready(): bool {
+        return (bool) $this->get_sync_data( 'spawning_action_ended_at' );
     }
 }
