@@ -9,6 +9,7 @@ namespace AS_Processor_Demo\Tests\Integration;
 
 use AS_Processor_Demo\Tests\Support\Action_Scheduler_Test_Helper;
 use AS_Processor_Demo\Tests\Support\E2E_Test_Case;
+use AS_Processor_Demo\Tests\Support\Parallel_Finish_Test_Sync;
 use Exception;
 use Generator;
 use juvo\AS_Processor\Entities\Chunk;
@@ -51,7 +52,15 @@ class Action_Tracking_Regression_Test extends E2E_Test_Case {
 		Action_Scheduler_Test_Helper::run_action( $action_id );
 
 		$this->assertSame( 1, $complete_calls, 'The per-action complete hook should fire for a direct Sync action.' );
-		$this->assertSame( 1, $finish_calls, 'The finish hook should fire once after the final direct Sync action completes.' );
+
+		// The finish hook is deferred to a dedicated finish-check action, so it
+		// has not fired yet at this point.
+		$this->assertSame( 0, $finish_calls, 'Finish is deferred until the finish-check action runs.' );
+
+		$processed = Action_Scheduler_Test_Helper::run_all_pending( $sync->get_sync_name() . '/finish_check', $group );
+
+		$this->assertSame( 1, $processed, 'The completing action should schedule exactly one finish-check action.' );
+		$this->assertSame( 1, $finish_calls, 'The finish hook should fire once the finish-check action runs.' );
 	}
 
 	public function test_delete_tracking_ignores_chunks_owned_by_other_syncs(): void {
@@ -114,6 +123,55 @@ class Action_Tracking_Regression_Test extends E2E_Test_Case {
 		do_action( $first_job->get_sync_name() . '/finish', 'test_group' );
 
 		$this->assertSame( $second_job->get_sync_name(), $sequence->get_current_job_name(), 'Sequential sync should advance once the current job finishes.' );
+	}
+
+	public function test_parallel_chunk_completion_fires_finish_exactly_once(): void {
+		$sync = new Parallel_Finish_Test_Sync();
+		$sync->schedule();
+
+		$group      = $sync->get_sync_group_name();
+		$finish_check_hook = Parallel_Finish_Test_Sync::SYNC_NAME . '/finish_check';
+		$action_ids = Action_Scheduler_Test_Helper::get_pending_action_ids(
+			Parallel_Finish_Test_Sync::SYNC_NAME . '/process_chunk',
+			$group
+		);
+
+		$this->assertCount( 2, $action_ids, 'The test sync should schedule two chunks.' );
+
+		// Complete both chunks at the same time in separate processes. This is the
+		// scenario where an inline finish check would race and possibly fire zero
+		// times. With the deferred finish-check the chunks only schedule the check.
+		$processed = Action_Scheduler_Test_Helper::run_actions_in_parallel( $action_ids );
+
+		$this->assertSame( 2, $processed, 'Both queued chunks should be processed.' );
+		$this->assertGreaterThanOrEqual(
+			2,
+			Action_Scheduler_Test_Helper::get_last_parallel_active_worker_count(),
+			'Expected more than one parallel Action Scheduler worker to process actions.'
+		);
+
+		$parallel_writes = $sync->get_parallel_writes();
+		sort( $parallel_writes );
+
+		$this->assertSame( array( 'first', 'second' ), $parallel_writes, 'Concurrent sync-data writes should preserve both worker updates.' );
+
+		// Concurrent completions must schedule at least one finish-check so the
+		// finish hook is reachable. A small race can produce one per worker.
+		$pending_finish_checks = Action_Scheduler_Test_Helper::get_pending_action_ids( $finish_check_hook, $group );
+		$this->assertGreaterThanOrEqual( 1, count( $pending_finish_checks ), 'Concurrent completions must schedule a finish-check.' );
+		$this->assertLessThanOrEqual( count( $action_ids ), count( $pending_finish_checks ), 'Idempotent scheduling should keep finish-checks bounded by the worker count.' );
+
+		// Draining the finish-check(s) fires the finish hook exactly once, even if
+		// more than one finish-check ran, thanks to the mark_finish_ready() guard.
+		Action_Scheduler_Test_Helper::run_until_idle( array( $finish_check_hook ), $group );
+
+		$this->assertSame(
+			array( $group ),
+			$sync->get_finish_groups(),
+			'The finish hook must fire exactly once for the group.'
+		);
+
+		$this->assert_sync_finished( $group );
 	}
 
 	/**

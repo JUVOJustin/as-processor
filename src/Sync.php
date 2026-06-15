@@ -35,6 +35,12 @@ use juvo\AS_Processor\Entities\ProcessStatus;
  * - `{sync_name}/finish` - Fires once when all actions in the group are complete
  *   Parameters: string $group_name
  *
+ * ### Internal Hooks
+ * - `{sync_name}/finish_check` - A scheduled action that re-evaluates completion
+ *   and fires `{sync_name}/finish`. Completing work actions schedule it instead
+ *   of firing the finish hook inline, which keeps the finish hook reliable when
+ *   actions complete concurrently. Not intended for external use.
+ *
  * ### Error Hooks
  * - `{sync_name}/fail` - Fires when an action fails with an exception
  *   Parameters: ActionScheduler_Action $action, Exception $e, int $action_id
@@ -68,9 +74,13 @@ abstract class Sync implements Syncable {
 	/**
 	 * ID of the action scheduler action in scope.
 	 *
+	 * Defaults to 0 so reads before an action is in scope return falsy instead of
+	 * throwing the "typed property must not be accessed before initialization"
+	 * error (guards like `if ( ! $this->action_id )` rely on this).
+	 *
 	 * @var int
 	 */
-	protected int $action_id;
+	protected int $action_id = 0;
 
 	/**
 	 * Initializes the class instance.
@@ -90,6 +100,11 @@ abstract class Sync implements Syncable {
 	 */
 	public function set_hooks(): void {
 		add_action( $this->get_sync_name() . '/process_chunk', array( $this, 'process_chunk' ) );
+
+		// Deferred finish job. Completing actions schedule this instead of firing
+		// the finish hook inline, so the completion check runs after concurrent
+		// actions have settled.
+		add_action( $this->get_finish_check_hook(), array( $this, 'run_finish_check' ) );
 
 		// If Sync finish execute after sync complete
 		add_action( $this->get_sync_name() . '/finish', array( $this, 'on_finish' ) );
@@ -121,13 +136,22 @@ abstract class Sync implements Syncable {
 	abstract protected function process_chunk( int $chunk_id ): void;
 
 	/**
-	 * Returns the sync group name. If none set it will generate one from the sync name and the current time
+	 * Returns the sync group name. If none set it generates a unique one from the sync name.
+	 *
+	 * A UUID suffix (not a timestamp) is used so two runs of the same sync never
+	 * share a group. Run-scoped state — chunk rows, sync data, and the
+	 * `finish_fired_at` finish guard — is keyed by this group, so a collision
+	 * would let one run's chunks and finish marker bleed into another.
 	 *
 	 * @return string
 	 */
 	public function get_sync_group_name(): string {
 		if ( empty( $this->sync_group_name ) ) {
-			$this->sync_group_name = $this->get_sync_name() . '_' . time();
+			$this->sync_group_name = sprintf(
+				'%s_%s',
+				$this->get_sync_name(),
+				str_replace( '-', '', wp_generate_uuid4() )
+			);
 		}
 		return $this->sync_group_name;
 	}
@@ -171,8 +195,12 @@ abstract class Sync implements Syncable {
 	 * 1. Verifies the action belongs to this sync
 	 * 2. Updates the chunk status to FINISHED
 	 * 3. Fires the per-action `{sync_name}/complete` hook (passes ActionScheduler_Action object)
-	 * 4. Checks if all actions in the group are done
-	 * 5. If all complete, fires the `{sync_name}/finish` hook once
+	 * 4. Schedules a deferred finish-check action that decides whether the run is done
+	 *
+	 * The finish hook itself is not fired here. Deferring it to its own action
+	 * avoids a race where two chunk actions complete at the same time in separate
+	 * processes and each reads the other as still running, so neither would fire
+	 * the finish hook. See run_finish_check().
 	 *
 	 * @param int $action_id ID of the completed action.
 	 * @return void
@@ -191,6 +219,12 @@ abstract class Sync implements Syncable {
 			return;
 		}
 
+		// The finish-check action only re-evaluates completion. It carries no
+		// chunk payload and must not schedule another finish-check for itself.
+		if ( $action->get_hook() === $this->get_finish_check_hook() ) {
+			return;
+		}
+
 		// set the end time of the chunk
 		$action_arguments = $action->get_args();
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
@@ -203,11 +237,14 @@ abstract class Sync implements Syncable {
 		// Fire per-action completion hook
 		do_action( $this->get_sync_name() . '/complete', $action, $action_id );
 
-		if ( ! $this->should_trigger_finish( $action ) ) {
-			return;
+		// Defer the finish decision to a dedicated action so it is evaluated once
+		// concurrent completions have settled. Only grouped work actions (chunks
+		// and grouped fetches) drive this. Ungrouped spawner actions — the import
+		// root, or a Sequential_Sync root that only enqueues child jobs — have no
+		// group of their own to finish and must not schedule a finish-check.
+		if ( ! empty( $action->get_group() ) ) {
+			$this->schedule_finish_check();
 		}
-
-		do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
 	}
 
 	/**
@@ -231,6 +268,12 @@ abstract class Sync implements Syncable {
 
 		$this->sync_group_name = $action->get_group();
 
+		// The finish-check action only re-evaluates completion. Setting the group
+		// above is enough for run_finish_check(); it must not emit the /start hook.
+		if ( $action->get_hook() === $this->get_finish_check_hook() ) {
+			return;
+		}
+
 		// set the start time of the chunk
 		$action_arguments = $action->get_args();
 		if ( ! empty( $action_arguments['chunk_id'] ) ) {
@@ -246,14 +289,20 @@ abstract class Sync implements Syncable {
 	/**
 	 * Checks if the passed action belongs to the sync. If so returns the action object else false.
 	 *
+	 * Matches the sync's own hooks exactly — the root hook `{sync_name}` and its
+	 * sub-hooks `{sync_name}/...` (process_chunk, finish_check). A plain substring
+	 * test would wrongly claim actions of a different sync whose name merely
+	 * contains this one (e.g. "orders" matching "orders_archive/process_chunk").
+	 *
 	 * @param int $action_id ID of the action to check.
 	 * @return false|ActionScheduler_Action
 	 */
 	private function action_belongs_to_sync( int $action_id ): false|ActionScheduler_Action {
-		$action = ActionScheduler_Store::instance()->fetch_action( (string) $action_id );
+		$action    = ActionScheduler_Store::instance()->fetch_action( (string) $action_id );
+		$hook      = $action->get_hook();
+		$sync_name = $this->get_sync_name();
 
-		// Action must contain the sync name as hook. Else it does not belong to sync
-		if ( ! str_contains( $action->get_hook(), $this->get_sync_name() ) ) {
+		if ( $hook !== $sync_name && ! str_starts_with( $hook, $sync_name . '/' ) ) {
 			return false;
 		}
 
@@ -430,7 +479,11 @@ abstract class Sync implements Syncable {
 	 * actions remain in the current group. Import variants can override this to add
 	 * additional completion prerequisites.
 	 *
-	 * @param ActionScheduler_Action $action The action that just completed.
+	 * The action passed here is the finish-check action (see run_finish_check()),
+	 * which is itself a running action in the group. It and any sibling
+	 * finish-check actions are ignored so the run can be recognised as complete.
+	 *
+	 * @param ActionScheduler_Action $action The finish-check action being processed.
 	 * @return bool
 	 */
 	protected function should_trigger_finish( ActionScheduler_Action $action ): bool {
@@ -442,15 +495,145 @@ abstract class Sync implements Syncable {
 
 		$this->sync_group_name = $group_name;
 
-		$remaining_actions = $this->get_actions(
-			array(
-				ActionScheduler_Store::STATUS_PENDING,
-				ActionScheduler_Store::STATUS_RUNNING,
-			),
-			1
+		return ! $this->has_unfinished_actions();
+	}
+
+	/**
+	 * Whether the current group still has pending or running work actions.
+	 *
+	 * Finish-check actions are infrastructure, not work, so they do not count as
+	 * unfinished. This lets the finish-check that is currently running (and any
+	 * duplicate that was scheduled by a concurrent completion) recognise the run
+	 * as complete. The answer is derived from two count queries — total pending or
+	 * running minus the finish-checks among them — so it is exact regardless of
+	 * how many actions remain (no per-action hydration, no result-page cap).
+	 *
+	 * @return bool
+	 */
+	private function has_unfinished_actions(): bool {
+		if ( ! ActionScheduler::is_initialized( __FUNCTION__ ) ) {
+			return false;
+		}
+
+		$store    = ActionScheduler::store();
+		$statuses = array(
+			ActionScheduler_Store::STATUS_PENDING,
+			ActionScheduler_Store::STATUS_RUNNING,
 		);
 
-		return empty( $remaining_actions );
+		$pending_total = (int) $store->query_actions(
+			array(
+				'group'   => $this->get_sync_group_name(),
+				'claimed' => null,
+				'status'  => $statuses,
+			),
+			'count'
+		);
+
+		if ( 0 === $pending_total ) {
+			return false;
+		}
+
+		$pending_finish_checks = (int) $store->query_actions(
+			array(
+				'group'   => $this->get_sync_group_name(),
+				'hook'    => $this->get_finish_check_hook(),
+				'claimed' => null,
+				'status'  => $statuses,
+			),
+			'count'
+		);
+
+		return $pending_total > $pending_finish_checks;
+	}
+
+	/**
+	 * Return the hook used for the deferred finish-check action.
+	 *
+	 * @return string
+	 */
+	protected function get_finish_check_hook(): string {
+		return $this->get_sync_name() . '/finish_check';
+	}
+
+	/**
+	 * Schedule the deferred finish-check action for the current run.
+	 *
+	 * Called from every work-action completion. At most one finish-check is kept
+	 * pending per run, so this stays cheap no matter how many chunks complete.
+	 * The check itself is authoritative and runs after the completions settle, so
+	 * the finish hook is reached even when the inline state was ambiguous.
+	 *
+	 * @return void
+	 */
+	protected function schedule_finish_check(): void {
+		$group = $this->get_sync_group_name();
+		$hook  = $this->get_finish_check_hook();
+
+		$pending = as_get_scheduled_actions(
+			array(
+				'hook'     => $hook,
+				'group'    => $group,
+				'status'   => ActionScheduler_Store::STATUS_PENDING,
+				'per_page' => 1,
+			),
+			'ids'
+		);
+
+		if ( ! empty( $pending ) ) {
+			return;
+		}
+
+		as_enqueue_async_action( $hook, array(), $group );
+	}
+
+	/**
+	 * Callback for the deferred finish-check action.
+	 *
+	 * Re-evaluates whether the run is complete and, if so, fires the finish hook
+	 * exactly once. Running this as its own action means the completion check
+	 * happens after the concurrent work actions have settled, which is what makes
+	 * the finish hook reliable under parallel execution. mark_finish_ready() still
+	 * guards against a duplicate finish-check firing twice.
+	 *
+	 * @return void
+	 * @throws Exception When sync data access fails.
+	 */
+	public function run_finish_check(): void {
+		if ( ! $this->action_id ) {
+			return;
+		}
+
+		// A missing action yields a null-object whose group is empty, which
+		// should_trigger_finish() treats as "not ready".
+		$action = ActionScheduler_Store::instance()->fetch_action( (string) $this->action_id );
+
+		if ( ! $this->should_trigger_finish( $action ) ) {
+			return;
+		}
+
+		if ( ! $this->mark_finish_ready() ) {
+			return;
+		}
+
+		do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
+	}
+
+	/**
+	 * Marks the current run as finished and reports whether this caller won the race.
+	 *
+	 * Several chunk actions can complete at the same time in separate processes,
+	 * so more than one of them may observe an empty group at once. This stores a
+	 * `finish_fired_at` marker atomically, scoped to the sync group name, and
+	 * returns true only for the single caller that stored it. The group scope
+	 * keeps the marker isolated per run, including sequential-sync child jobs
+	 * that share a sync-data name but run under their own group.
+	 *
+	 * @return bool True when this caller should fire the finish hook.
+	 * @throws Exception When the marker cannot be written.
+	 */
+	protected function mark_finish_ready(): bool {
+		return $this->add_once( 'finish_fired_at', time(), $this->get_sync_group_name() );
 	}
 
 	/**

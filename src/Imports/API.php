@@ -4,7 +4,6 @@ namespace juvo\AS_Processor\Imports;
 
 use ActionScheduler_Store;
 use Exception;
-use juvo\AS_Processor\DB\Chunk_DB;
 use juvo\AS_Processor\Import;
 
 abstract class API extends Import
@@ -228,19 +227,10 @@ abstract class API extends Import
      * KNOWN LIMITATION - Potential Race Condition:
      * The query for pending/running actions (lines below) and the subsequent check are not atomic.
      * Between checking for running actions and updating the sync data, another fetch action could
-     * complete. This could theoretically cause:
-     * 1. The 'spawning_action_ended_at' to be set prematurely if the last action completes
-     *    between the query and the update
-     * 2. Multiple actions to update 'spawning_action_ended_at' if several complete simultaneously
-     *
-     * However, this race condition has minimal practical impact because:
-     * - The timestamp will be set to approximately the correct time (within seconds)
-     * - Multiple updates will overwrite with similar timestamp values
-     * - The finish action trigger still requires all chunks to be completed, providing an
-     *   additional safety check
-     *
-     * A proper fix would require database-level locking or transactional guarantees, which
-     * would add significant complexity for marginal benefit in this use case.
+     * complete. This could theoretically cause the 'spawning_action_ended_at' to be set prematurely
+     * or by several actions at once. The practical impact is minimal because the timestamp is only
+     * read as a boolean readiness flag, and the finish hook itself is fired exactly once by the
+     * group-scoped guard in Sync::handle_complete().
      *
      * @param \ActionScheduler_Action $action The action being completed.
      * @return void
@@ -248,31 +238,23 @@ abstract class API extends Import
      */
     public function on_complete( \ActionScheduler_Action $action ): void {
 
-        if ( isset( $action->get_args()['index'] ) ) {
-            $fetches = as_get_scheduled_actions([
-                'hook'        => $action->get_hook(),
-                'group'       => $action->get_group(),
-                'status'      => [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING],
-                'per_page'    => 1,
-            ]);
-
-            if ( ! empty( $fetches ) ) {
-                return; // There are still pending or running fetch actions
-            }
-
-            $this->update_sync_data( 'spawning_action_ended_at', time() );
+        if ( ! isset( $action->get_args()['index'] ) ) {
+            return;
         }
 
-        // Check if action of the same group is running or pending
-        $completed = Chunk_DB::db()->are_all_chunks_completed( $this->get_sync_group_name() );
+        $fetches = as_get_scheduled_actions([
+            'hook'        => $action->get_hook(),
+            'group'       => $action->get_group(),
+            'status'      => [ActionScheduler_Store::STATUS_PENDING, ActionScheduler_Store::STATUS_RUNNING],
+            'per_page'    => 1,
+        ]);
 
-        // Trigger finish only if no other actions of the same group are pending or running and if the spawning action has started and ended
-        if (
-            $completed
-            && $this->get_sync_data( 'spawning_action_started_at' )
-            && $this->get_sync_data( 'spawning_action_ended_at' )
-        ) {
-            do_action( $this->get_sync_name() . '/finish', $this->get_sync_group_name() );
+        if ( ! empty( $fetches ) ) {
+            return; // There are still pending or running fetch actions
         }
+
+        // Mark fetching as done. The finish hook is fired by Sync::handle_complete()
+        // once should_trigger_finish() confirms all chunks completed as well.
+        $this->update_sync_data( 'spawning_action_ended_at', time() );
     }
 }

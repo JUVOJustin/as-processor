@@ -47,8 +47,10 @@ class Sequential_Sync_Test extends E2E_Test_Case {
 				Combined_Sequential_Import::SYNC_NAME,
 				Sequential_Product_CSV_Import::SYNC_NAME,
 				Sequential_Product_CSV_Import::SYNC_NAME . '/process_chunk',
+				Sequential_Product_CSV_Import::SYNC_NAME . '/finish_check',
 				Sequential_Lead_JSON_Import::SYNC_NAME,
 				Sequential_Lead_JSON_Import::SYNC_NAME . '/process_chunk',
+				Sequential_Lead_JSON_Import::SYNC_NAME . '/finish_check',
 			),
 			null,
 			100
@@ -82,8 +84,10 @@ class Sequential_Sync_Test extends E2E_Test_Case {
 				Combined_Sequential_Import::SYNC_NAME,
 				Sequential_Product_CSV_Import::SYNC_NAME,
 				Sequential_Product_CSV_Import::SYNC_NAME . '/process_chunk',
+				Sequential_Product_CSV_Import::SYNC_NAME . '/finish_check',
 				Sequential_Lead_JSON_Import::SYNC_NAME,
 				Sequential_Lead_JSON_Import::SYNC_NAME . '/process_chunk',
+				Sequential_Lead_JSON_Import::SYNC_NAME . '/finish_check',
 			),
 			null,
 			100
